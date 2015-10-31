@@ -11,7 +11,7 @@ extern crate rand;
 use serde::{Serialize, Deserialize};
 use net2::TcpStreamExt;
 
-use std::net::{TcpListener, TcpStream, ToSocketAddrs, Shutdown};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs, Shutdown, SocketAddr};
 use std::sync::{RwLock, Arc, Mutex};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -23,12 +23,18 @@ use std::thread::{self, JoinHandle};
 use std::io::Error as IoError;
 use std::io::BufWriter;
 
-//pub trait Message: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static {}
-//pub trait NodeId: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static {}
-//pub trait InitMsg: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static {}
+pub trait Message: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static {}
+impl<T> Message for T where T: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static {}
+
+pub trait NodeId: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static {}
+impl<T> NodeId for T where T: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static {}
+
+pub trait InitMsg: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static {}
+impl<T> InitMsg for T where T: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static {}
+
 
 #[derive(Debug)]
-pub enum Error<N> where N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static {
+pub enum Error<N> where N: NodeId {
     BindError(IoError),
     AcceptError(IoError),
     SocketOptionError(IoError),
@@ -40,11 +46,7 @@ pub enum Error<N> where N: Serialize + Deserialize + Send + Sync + Debug + Clone
     CloseConnection(IoError),
 }
 
-pub trait Callback<M, N, I>: Send + Sync + 'static where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static
-{
+pub trait Callback<M: Message, N: NodeId, I: InitMsg>: Send + Sync {
     fn node_id(&self, &Node<M, N, I>) -> N;
     fn create_init_msg(&self, &Node<M, N, I>) -> I;
     fn connection_timeout(&self, &Node<M, N, I>) -> Duration;
@@ -54,28 +56,33 @@ pub trait Callback<M, N, I>: Send + Sync + 'static where
     fn on_disconnected(&self, &Node<M, N, I>, &N);
 }
 
+pub struct CloseGuard<M: Message, N: NodeId, I: InitMsg>(Node<M, N, I>);
 
-pub struct NodeInner<M, N, I> where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static
-{
+impl<M: Message, N: NodeId, I: InitMsg> Drop for CloseGuard<M, N, I> {
+    fn drop(&mut self) {
+        self.0.close().expect("Failed to close node");
+    }
+}
+
+impl<M: Message, N: NodeId, I: InitMsg> Deref for CloseGuard<M, N, I> {
+    type Target = Node<M, N, I>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+
+pub struct NodeInner<M: Message, N: NodeId, I: InitMsg> {
     callback: Box<Callback<M, N, I>>,
     sockets: Mutex<Vec<(Arc<TcpListener>, JoinHandle<Result<(), Error<N>>>)>>,
     connections: RwLock<HashMap<N, Connection<M, N, I>>>,
 }
 
 #[derive(Clone)]
-pub struct Node<M, N, I>(Arc<NodeInner<M, N, I>>) where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static;
+pub struct Node<M: Message, N: NodeId, I: InitMsg>(Arc<NodeInner<M, N, I>>);
 
-impl<M, N, I> Deref for Node<M, N, I> where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static
-{
+impl<M: Message, N: NodeId, I: InitMsg> Deref for Node<M, N, I> {
     type Target = NodeInner<M, N, I>;
 
     fn deref(&self) -> &Self::Target {
@@ -83,17 +90,13 @@ impl<M, N, I> Deref for Node<M, N, I> where
     }
 }
 
-impl<M, N, I> Node<M, N, I> where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static
-{
-    pub fn new(callback: Box<Callback<M, N, I>>) -> Self {
-        Node(Arc::new(NodeInner{
+impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
+    pub fn new(callback: Box<Callback<M, N, I>>) -> CloseGuard<M, N, I> {
+        CloseGuard(Node(Arc::new(NodeInner{
             callback: callback,
             sockets: Mutex::new(Vec::new()),
             connections: RwLock::new(HashMap::new()),
-        }))
+        })))
     }
 
     pub fn open<A: ToSocketAddrs>(&self, addr: A) -> Result<(), Error<N>> {
@@ -104,6 +107,14 @@ impl<M, N, I> Node<M, N, I> where
         let join = thread::spawn(move || cloned_self.run_server(cloned_server));
         servers.push((server, join));
         Ok(())
+    }
+
+    pub fn addresses(&self) -> Vec<SocketAddr> {
+        let mut addrs = Vec::new();
+        for &(ref sock, _) in &self.sockets.lock().expect("Lock poisoned") as &Vec<(Arc<TcpListener>, _)> {
+            addrs.push(sock.local_addr().expect("Failed to obtain address"));
+        }
+        addrs
     }
 
     fn node_id(&self) -> N {
@@ -198,27 +209,16 @@ impl<M, N, I> Node<M, N, I> where
 }
 
 
-pub struct ConnectionInner<M, N, I> where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static
-{
+pub struct ConnectionInner<M: Message, N: NodeId, I: InitMsg> {
     server: Node<M, N, I>,
     socket: RwLock<TcpStream>,
     node_id: N
 }
 
 #[derive(Clone)]
-pub struct Connection<M, N, I>(Arc<ConnectionInner<M, N, I>>) where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static;
+pub struct Connection<M: Message, N: NodeId, I: InitMsg>(Arc<ConnectionInner<M, N, I>>);
 
-impl<M, N, I> Deref for Connection<M, N, I> where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static
-{
+impl<M: Message, N: NodeId, I: InitMsg> Deref for Connection<M, N, I> {
     type Target = ConnectionInner<M, N, I>;
 
     fn deref(&self) -> &Self::Target {
@@ -226,11 +226,7 @@ impl<M, N, I> Deref for Connection<M, N, I> where
     }
 }
 
-impl<M, N, I> Connection<M, N, I> where
-    M: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static,
-    N: Serialize + Deserialize + Send + Sync + Debug + Clone + Eq + Hash + 'static,
-    I: Serialize + Deserialize + Send + Sync + Debug + Clone + 'static
-{
+impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
     fn new(server: Node<M, N, I>, mut socket: TcpStream) -> Result<Self, Error<N>> {
         try!(socket.set_nodelay(true).map_err(|err| Error::SocketOptionError(err)));
         try!(socket.set_read_timeout(Some(server.connection_timeout())).map_err(|err| Error::SocketOptionError(err)));
