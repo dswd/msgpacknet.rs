@@ -3,6 +3,7 @@ use super::*;
 use test::Bencher;
 use std::time::Duration;
 use std::sync::{Condvar, Mutex, Arc};
+use std::collections::VecDeque;
 
 
 struct BouncerCallbackInner {
@@ -46,9 +47,15 @@ impl Callback<u64, u64, u64> for BouncerCallback {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum Event {
+    Msg(u64, u64),
+    Connected(u64),
+    Disconnected(u64),
+}
 
 struct DummyCallbackInner {
-    msgs: Mutex<Vec<(u64, u64)>>,
+    msgs: Mutex<VecDeque<Event>>,
     waiter: Condvar,
     id: u64
 }
@@ -58,16 +65,16 @@ struct DummyCallback(Arc<DummyCallbackInner>);
 
 impl DummyCallback {
     fn new(id: u64) -> Self {
-        DummyCallback(Arc::new(DummyCallbackInner{msgs: Mutex::new(Vec::new()), waiter: Condvar::new(), id: id}))
+        DummyCallback(Arc::new(DummyCallbackInner{msgs: Mutex::new(VecDeque::new()), waiter: Condvar::new(), id: id}))
     }
 
-    fn recv(&self) -> (u64, u64) {
+    fn recv(&self) -> Event {
         let mut lock = self.0.msgs.lock().expect("Lock poisoned");
         if lock.len() > 0 {
-            return lock.remove(0);
+            return lock.pop_front().unwrap();
         }
         let mut lock = self.0.waiter.wait(lock).expect("Lock poisoned");
-        lock.remove(0)
+        lock.pop_front().unwrap()
     }
 }
 
@@ -88,14 +95,18 @@ impl Callback<u64, u64, u64> for DummyCallback {
         Duration::from_secs(1)
     }
 
-    fn on_connected(&self, _node: &Node<u64, u64, u64>, _id: &u64) {
+    fn on_connected(&self, _node: &Node<u64, u64, u64>, id: &u64) {
+        self.0.msgs.lock().expect("Lock poisoned").push_back(Event::Connected(*id));
+        self.0.waiter.notify_all();
     }
 
-    fn on_disconnected(&self, _node: &Node<u64, u64, u64>, _id: &u64) {
+    fn on_disconnected(&self, _node: &Node<u64, u64, u64>, id: &u64) {
+        self.0.msgs.lock().expect("Lock poisoned").push_back(Event::Disconnected(*id));
+        self.0.waiter.notify_all();
     }
 
     fn handle_message(&self, _node: &Node<u64, u64, u64>, src: &u64, msg: u64) {
-        self.0.msgs.lock().expect("Lock poisoned").push((*src, msg));
+        self.0.msgs.lock().expect("Lock poisoned").push_back(Event::Msg(*src, msg));
         self.0.waiter.notify_all();
     }
 }
@@ -125,7 +136,7 @@ fn node_send_self(b: &mut Bencher) {
     assert!(node.open("localhost:0").is_ok());
     b.iter(|| {
         assert!(node.send(0, &42).is_ok());
-        assert_eq!(callback.recv(), (0, 42))
+        assert_eq!(callback.recv(), Event::Msg(0, 42))
     });
     assert!(node.close().is_ok());
 }
@@ -135,9 +146,10 @@ fn node_connect() {
     let server = Node::new(Box::new(BouncerCallback::new(0)));
     assert!(server.open("localhost:0").is_ok());
     let client_callback = DummyCallback::new(1);
-    let client = Node::new(Box::new(client_callback));
+    let client = Node::new(Box::new(client_callback.clone()));
     assert!(client.open("localhost:0").is_ok());
     assert!(client.connect(server.addresses()[0]).is_ok());
+    assert_eq!(client_callback.recv(), Event::Connected(0));
     assert!(client.close().is_ok());
     assert!(server.close().is_ok());
 }
@@ -150,9 +162,10 @@ fn node_send_remote(b: &mut Bencher) {
     let client = Node::new(Box::new(client_callback.clone()));
     assert!(client.open("localhost:0").is_ok());
     assert!(client.connect(server.addresses()[0]).is_ok());
+    assert_eq!(client_callback.recv(), Event::Connected(0));
     b.iter(|| {
         assert!(client.send(0, &42).is_ok());
-        assert_eq!(client_callback.recv(), (0, 42))
+        assert_eq!(client_callback.recv(), Event::Msg(0, 42))
     });
     assert!(client.close().is_ok());
     assert!(server.close().is_ok());

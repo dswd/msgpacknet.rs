@@ -58,7 +58,7 @@ pub struct CloseGuard<M: Message, N: NodeId, I: InitMsg>(Node<M, N, I>);
 
 impl<M: Message, N: NodeId, I: InitMsg> Drop for CloseGuard<M, N, I> {
     fn drop(&mut self) {
-        self.0.close().expect("Failed to close node");
+        self.close().expect("Failed to close node");
     }
 }
 
@@ -181,7 +181,6 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
         let sock = try!(TcpStream::connect(addr).map_err(|err| Error::ConnectError(err)));
         let con = try!(Connection::new(self.clone(), sock));
         self.add_connection(con.clone());
-        self.callback.on_connected(&self, con.node_id());
         thread::spawn(move || con.run());
         Ok(())
     }
