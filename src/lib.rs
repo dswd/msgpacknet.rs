@@ -12,7 +12,7 @@ use serde::Deserialize;
 use net2::TcpStreamExt;
 
 use std::net::{TcpListener, TcpStream, ToSocketAddrs, Shutdown};
-use std::sync::{RwLock, Arc};
+use std::sync::{RwLock, Arc, Mutex};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::fmt::Debug;
@@ -52,7 +52,7 @@ pub trait Callback<M: Message, N: NodeId, I: InitMsg>: Send + Sync + 'static {
 
 pub struct NodeInner<M: Message, N: NodeId, I: InitMsg> {
     callback: Box<Callback<M, N, I>>,
-    socket: TcpListener,
+    sockets: Mutex<Vec<(Arc<TcpListener>, JoinHandle<Result<(), Error<N>>>)>>,
     connections: RwLock<HashMap<N, Connection<M, N, I>>>,
 }
 
@@ -68,15 +68,22 @@ impl<M: Message, N: NodeId, I: InitMsg> Deref for Node<M, N, I> {
 }
 
 impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
-    pub fn open<A: ToSocketAddrs>(callback: Box<Callback<M, N, I>>, addr: A) -> Result<(Self, JoinHandle<Result<(), Error<N>>>), Error<N>> {
-        let server = Node(Arc::new(NodeInner{
+    pub fn new(callback: Box<Callback<M, N, I>>) -> Self {
+        Node(Arc::new(NodeInner{
             callback: callback,
-            socket: try!(TcpListener::bind(addr).map_err(|err| Error::BindError(err))),
+            sockets: Mutex::new(Vec::new()),
             connections: RwLock::new(HashMap::new()),
-        }));
-        let cloned = server.clone();
-        let join = thread::spawn(move || cloned.run());
-        Ok((server, join))
+        }))
+    }
+
+    pub fn open<A: ToSocketAddrs>(&self, addr: A) -> Result<(), Error<N>> {
+        let mut servers = self.sockets.lock().expect("Lock poisoned");
+        let server: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr).map_err(|err| Error::BindError(err))));
+        let cloned_self = self.clone();
+        let cloned_server = server.clone();
+        let join = thread::spawn(move || cloned_self.run_server(cloned_server));
+        servers.push((server, join));
+        Ok(())
     }
 
     fn node_id(&self) -> N {
@@ -118,9 +125,9 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
         self.connections.read().expect("Lock poisoned").values().map(|c| c.clone()).collect()
     }
 
-    fn run(&self) -> Result<(), Error<N>> {
+    fn run_server(&self, socket: Arc<TcpListener>) -> Result<(), Error<N>> {
         loop {
-            let (sock, _) = try!(self.socket.accept().map_err(|e| Error::AcceptError(e)));
+            let (sock, _) = try!(socket.accept().map_err(|e| Error::AcceptError(e)));
             let con = try!(Connection::new(self.clone(), sock));
             self.add_connection(con.clone());
             thread::spawn(move || con.run());
@@ -150,15 +157,19 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
         Ok(())
     }
 
-    fn shutdown_socket(&self) -> Result<(), Error<N>> {
+    fn shutdown_socket(&self, socket: &TcpListener) -> Result<(), Error<N>> {
         //TODO: Remove this workaround once a proper API is available
-        let socket = unsafe { mem::transmute::<&TcpListener, &TcpStream>(&self.socket) };
+        let socket = unsafe { mem::transmute::<&TcpListener, &TcpStream>(socket) };
         socket.shutdown(Shutdown::Both).map_err(|e| Error::CloseServer(e))
     }
 
     #[inline]
     pub fn close(&self) -> Result<(), Error<N>> {
-        try!(self.shutdown_socket());
+        let mut sockets = self.sockets.lock().expect("Lock poisoned");
+        while let Some((s, j)) = sockets.pop() {
+            try!(self.shutdown_socket(&s));
+            j.join().expect("Failed to join").ok();
+        }
         for c in self.get_connections() {
             let _ = c.close();
         }
