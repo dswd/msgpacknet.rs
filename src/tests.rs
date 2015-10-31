@@ -6,47 +6,6 @@ use std::sync::{Condvar, Mutex, Arc};
 use std::collections::VecDeque;
 
 
-struct BouncerCallbackInner {
-    id: u64
-}
-
-#[derive(Clone)]
-struct BouncerCallback(Arc<BouncerCallbackInner>);
-
-impl BouncerCallback {
-    fn new(id: u64) -> Self {
-        BouncerCallback(Arc::new(BouncerCallbackInner{id: id}))
-    }
-}
-
-impl Callback<u64, u64, u64> for BouncerCallback {
-    fn node_id(&self, _node: &Node<u64, u64, u64>) -> u64 {
-        self.0.id
-    }
-
-    fn create_init_msg(&self, _node: &Node<u64, u64, u64>) -> u64 {
-        self.0.id
-    }
-
-    fn node_id_from_init_msg(&self, _node: &Node<u64, u64, u64>, id: &u64) -> u64 {
-        *id
-    }
-
-    fn connection_timeout(&self, _node: &Node<u64, u64, u64>) -> Duration {
-        Duration::from_secs(1)
-    }
-
-    fn on_connected(&self, _node: &Node<u64, u64, u64>, _id: &u64) {
-    }
-
-    fn on_disconnected(&self, _node: &Node<u64, u64, u64>, _id: &u64) {
-    }
-
-    fn handle_message(&self, node: &Node<u64, u64, u64>, src: &u64, msg: u64) {
-        node.send(*src, &msg).expect("Failed to send");
-    }
-}
-
 #[derive(Debug, PartialEq)]
 enum Event {
     Msg(u64, u64),
@@ -57,15 +16,16 @@ enum Event {
 struct DummyCallbackInner {
     msgs: Mutex<VecDeque<Event>>,
     waiter: Condvar,
-    id: u64
+    id: u64,
+    bounce: bool,
 }
 
 #[derive(Clone)]
 struct DummyCallback(Arc<DummyCallbackInner>);
 
 impl DummyCallback {
-    fn new(id: u64) -> Self {
-        DummyCallback(Arc::new(DummyCallbackInner{msgs: Mutex::new(VecDeque::new()), waiter: Condvar::new(), id: id}))
+    fn new(id: u64, bounce: bool) -> Self {
+        DummyCallback(Arc::new(DummyCallbackInner{msgs: Mutex::new(VecDeque::new()), waiter: Condvar::new(), id: id, bounce: bounce}))
     }
 
     fn recv(&self) -> Event {
@@ -105,23 +65,27 @@ impl Callback<u64, u64, u64> for DummyCallback {
         self.0.waiter.notify_all();
     }
 
-    fn handle_message(&self, _node: &Node<u64, u64, u64>, src: &u64, msg: u64) {
-        self.0.msgs.lock().expect("Lock poisoned").push_back(Event::Msg(*src, msg));
-        self.0.waiter.notify_all();
+    fn handle_message(&self, node: &Node<u64, u64, u64>, src: &u64, msg: u64) {
+        if self.0.bounce {
+            node.send(*src, &msg).expect("Failed to send");
+        } else {
+            self.0.msgs.lock().expect("Lock poisoned").push_back(Event::Msg(*src, msg));
+            self.0.waiter.notify_all();
+        }
     }
 }
 
 
 #[test]
 fn node_create() {
-    let callback = DummyCallback::new(0);
+    let callback = DummyCallback::new(0, false);
     let node = Node::new(Box::new(callback));
     assert!(node.close().is_ok());
 }
 
 #[test]
 fn node_open() {
-    let callback = DummyCallback::new(0);
+    let callback = DummyCallback::new(0, false);
     let node = Node::new(Box::new(callback));
     assert!(node.open("localhost:0").is_ok());
     let addrs = node.addresses();
@@ -131,7 +95,7 @@ fn node_open() {
 
 #[bench]
 fn node_send_self(b: &mut Bencher) {
-    let callback = DummyCallback::new(0);
+    let callback = DummyCallback::new(0, false);
     let node = Node::new(Box::new(callback.clone()));
     assert!(node.open("localhost:0").is_ok());
     b.iter(|| {
@@ -144,9 +108,9 @@ fn node_send_self(b: &mut Bencher) {
 
 #[test]
 fn node_connect() {
-    let server = Node::new(Box::new(BouncerCallback::new(0)));
+    let server = Node::new(Box::new(DummyCallback::new(0, true)));
     assert!(server.open("localhost:0").is_ok());
-    let client_callback = DummyCallback::new(1);
+    let client_callback = DummyCallback::new(1, false);
     let client = Node::new(Box::new(client_callback.clone()));
     assert!(client.open("localhost:0").is_ok());
     assert!(!client.is_connected(&0));
@@ -159,9 +123,9 @@ fn node_connect() {
 
 #[bench]
 fn node_send_remote(b: &mut Bencher) {
-    let server = Node::new(Box::new(BouncerCallback::new(0)));
+    let server = Node::new(Box::new(DummyCallback::new(0, true)));
     assert!(server.open("localhost:0").is_ok());
-    let client_callback = DummyCallback::new(1);
+    let client_callback = DummyCallback::new(1, false);
     let client = Node::new(Box::new(client_callback.clone()));
     assert!(client.open("localhost:0").is_ok());
     assert!(client.connect(server.addresses()[0]).is_ok());
