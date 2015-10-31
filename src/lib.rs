@@ -2,8 +2,6 @@
 extern crate serde;
 extern crate rmp_serde;
 extern crate net2;
-extern crate time;
-extern crate rand;
 #[cfg(test)] extern crate test;
 
 #[cfg(test)] mod tests;
@@ -38,8 +36,8 @@ pub enum Error<N> where N: NodeId {
     BindError(IoError),
     AcceptError(IoError),
     SocketOptionError(IoError),
-    Serialize(rmp_serde::encode::Error),
-    Deserialize(rmp_serde::decode::Error),
+    SerializeError,
+    DeserializeError,
     UnreachableDestination(N),
     ConnectError(IoError),
     CloseServer(IoError),
@@ -233,11 +231,11 @@ impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
         {
             let mut writer = rmp_serde::Serializer::new(&mut socket);
             let init = server.create_init_msg();
-            try!(init.serialize(&mut writer).map_err(|e| Error::Serialize(e)));
+            try!(init.serialize(&mut writer).map_err(|_| Error::SerializeError));
         }
         let init = {
             let mut reader = rmp_serde::Deserializer::new(&socket);
-            try!(I::deserialize(&mut reader).map_err(|e| Error::Deserialize(e)))
+            try!(I::deserialize(&mut reader).map_err(|_| Error::DeserializeError))
         };
         let node_id = server.node_id_from_init_msg(&init);
         Ok(Connection(Arc::new(ConnectionInner{server: server, socket: RwLock::new(socket), node_id: node_id})))
@@ -251,7 +249,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
         let mut lock = self.socket.write().expect("Lock poisoned");
         let mut bufwriter = BufWriter::new(&mut lock as &mut TcpStream);
         let mut writer = rmp_serde::Serializer::new(&mut bufwriter);
-        msg.serialize(&mut writer).map_err(|e| Error::Serialize(e))
+        msg.serialize(&mut writer).map_err(|_| Error::SerializeError)
     }
 
     fn run(&self) -> Result<(), Error<N>> {
@@ -264,7 +262,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
         let input = self.socket.read().expect("Lock poisoned").try_clone().expect("Failed to clone socket");
         let mut reader = rmp_serde::Deserializer::new(input);
         loop {
-            let msg = try!(M::deserialize(&mut reader).map_err(|e| Error::Deserialize(e)));
+            let msg = try!(M::deserialize(&mut reader).map_err(|_| Error::DeserializeError));
             self.server.handle_message(&self.node_id, msg);
         }
     }
