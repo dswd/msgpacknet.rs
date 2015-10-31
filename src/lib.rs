@@ -150,6 +150,10 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
         self.connections.read().expect("Lock poisoned").get(id).map(|v| v.clone())
     }
 
+    pub fn is_connected(&self, id: &N) -> bool {
+        self.connections.read().expect("Lock poisoned").contains_key(id)
+    }
+
     fn get_connections(&self) -> Vec<Connection<M, N, I>> {
         self.connections.read().expect("Lock poisoned").values().map(|c| c.clone()).collect()
     }
@@ -169,11 +173,10 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
             self.handle_message(&dst, msg.clone());
             return Ok(());
         }
-        let con = match self.get_connection(&dst) {
-            Some(con) => con,
-            None => return Err(Error::UnreachableDestination(dst))
-        };
-        con.send(msg)
+        match self.get_connection(&dst) {
+            Some(con) => con.send(msg),
+            None => Err(Error::UnreachableDestination(dst))
+        }
     }
 
     #[inline]

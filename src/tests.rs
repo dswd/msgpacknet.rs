@@ -138,6 +138,7 @@ fn node_send_self(b: &mut Bencher) {
         assert!(node.send(0, &42).is_ok());
         assert_eq!(callback.recv(), Event::Msg(0, 42))
     });
+    assert!(!node.is_connected(&0));
     assert!(node.close().is_ok());
 }
 
@@ -148,7 +149,9 @@ fn node_connect() {
     let client_callback = DummyCallback::new(1);
     let client = Node::new(Box::new(client_callback.clone()));
     assert!(client.open("localhost:0").is_ok());
+    assert!(!client.is_connected(&0));
     assert!(client.connect(server.addresses()[0]).is_ok());
+    assert!(client.is_connected(&0));
     assert_eq!(client_callback.recv(), Event::Connected(0));
     assert!(client.close().is_ok());
     assert!(server.close().is_ok());
