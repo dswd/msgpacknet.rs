@@ -39,7 +39,7 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! let callback = SimpleCallback::<(), (u64, u64)>::with_random_id();
+//! let callback = SimpleCallback::<String, (u64, u64)>::with_random_id();
 //! ```
 //!
 //! Afterwards, the node can be created with a boxed copy of the callback as parameter.
@@ -88,10 +88,10 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<(), u64>::with_random_id();
+//! # let callback = SimpleCallback::<String, u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
 //! # let peer_id = node.node_id();
-//! # let msg = ();
+//! let msg = "Hello world".to_owned();
 //! node.send(peer_id, &msg).expect("Failed to send");
 //! ```
 //!
