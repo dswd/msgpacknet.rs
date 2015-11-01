@@ -120,6 +120,24 @@ pub trait Callback<M: Message, N: NodeId, I: InitMessage>: Send + Sync {
 
     }
 
+    /// Handle node closing start
+    ///
+    /// This method is called whenever the node is shutting down. At this time, all connections
+    /// are still active and can be used to send final messages.
+    #[allow(unused_variables)]
+    fn on_closing(&self, node: &Node<M, N, I>) {
+
+    }
+
+    /// Handle node closing end
+    ///
+    /// This method is called whenever the node has shut down. At this time, all connections
+    /// have been closed and no final messages can be sent.
+    #[allow(unused_variables)]
+    fn on_closed(&self, node: &Node<M, N, I>) {
+
+    }
+
     /// The connection timeout
     ///
     /// This method id called to determine the timeout used for connections. Whenever a connection
@@ -378,6 +396,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
 
     #[inline]
     fn close(&self) -> Result<(), Error<N>> {
+        self.callback.on_closing(&self);
         *self.closed.write().expect("Lock poisoned") = true;
         let mut sockets = self.sockets.lock().expect("Lock poisoned");
         while let Some((s, j)) = sockets.pop() {
@@ -387,6 +406,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         for c in self.get_connections() {
             let _ = c.close();
         }
+        self.callback.on_closed(&self);
         Ok(())
     }
 }

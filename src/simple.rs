@@ -17,6 +17,12 @@ pub enum SimpleCallbackEvent<M, N> {
 
     /// A lost connection
     Disconnected(N),
+
+    /// Node closing
+    Closing,
+
+    /// Node closed
+    Closed
 }
 
 pub struct SimpleCallbackInner<M, N> {
@@ -95,6 +101,9 @@ impl<M, N> Iterator for SimpleCallback<M, N> {
     type Item = SimpleCallbackEvent<M, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.receive())
+        match self.receive() {
+            SimpleCallbackEvent::Closed => None,
+            evt @ _ => Some(evt)
+        }
     }
 }
