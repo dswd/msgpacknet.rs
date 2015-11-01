@@ -30,6 +30,16 @@ pub struct SimpleCallbackInner<M, N> {
 /// * It uses the node id as an initialization message.
 /// * It accepts all incoming connections.
 /// * It stores all events in a queue of [`SimpleCallbackEvent`](enum.SimpleCallbackEvent.html).
+///
+/// # Examples
+/// ```
+/// # use msgpacknet::*;
+/// # type M = ();
+/// # type N = u64;
+/// # let node_id = 0;
+/// let callback = SimpleCallback::<M, N>::new(node_id);
+/// let node = Node::new(Box::new(callback.clone()));
+/// ```
 #[derive(Clone)]
 pub struct SimpleCallback<M, N>(Arc<SimpleCallbackInner<M, N>>);
 
