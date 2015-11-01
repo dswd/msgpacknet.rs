@@ -210,7 +210,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// # Examples
     /// ```
     /// # use msgpacknet::*;
-    /// # let callback = tests::DummyCallback::new(0, false);
+    /// # let callback = SimpleCallback::<(), u64>::new(0);
     /// let node = Node::new(Box::new(callback));
     /// ```
     pub fn new(callback: Box<Callback<M, N, I>>) -> CloseGuard<M, N, I> {
@@ -230,7 +230,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// # Examples
     /// ```
     /// # use msgpacknet::*;
-    /// # let callback = tests::DummyCallback::new(0, false);
+    /// # let callback = SimpleCallback::<(), u64>::new(0);
     /// let node = Node::new(Box::new(callback));
     /// assert!(node.open("0.0.0.0:0").is_ok());
     /// ```
@@ -252,7 +252,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// # Examples
     /// ```
     /// # use msgpacknet::*;
-    /// # let callback = tests::DummyCallback::new(0, false);
+    /// # let callback = SimpleCallback::<(), u64>::new(0);
     /// let node = Node::new(Box::new(callback));
     /// assert!(node.open("0.0.0.0:0").is_ok());
     /// let addresses = node.addresses();
@@ -342,19 +342,18 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// # Examples
     /// ```
     /// # use msgpacknet::*;
-    /// # let server = Node::new(Box::new(tests::DummyCallback::new(0, true)));
+    /// # let server = Node::new(Box::new(SimpleCallback::<(), u64>::new(0)));
     /// # assert!(server.open("localhost:0").is_ok());
-    /// # let client_callback = tests::DummyCallback::new(1, false);
+    /// # let client_callback = SimpleCallback::<(), u64>::new(1);
     /// # let callback = client_callback.clone();
     /// let node = Node::new(Box::new(callback));
     /// assert!(node.open("0.0.0.0:0").is_ok());
     /// # let server_addr = server.addresses()[0];
     /// assert!(node.connect(server_addr).is_ok());
-    /// # assert_eq!(client_callback.recv(), tests::Event::Connected(0));
+    /// # assert_eq!(client_callback.recv(), SimpleCallbackEvent::Connected(0));
     /// # let server_id = 0;
-    /// # let msg = &42;
+    /// # let msg = &();
     /// assert!(node.send(server_id, msg).is_ok());
-    /// # assert_eq!(client_callback.recv(), tests::Event::Msg(0, 42));
     /// ```
     #[inline]
     pub fn send(&self, dst: N, msg: &M) -> Result<(), Error<N>> {
@@ -381,9 +380,9 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// # Examples
     /// ```
     /// # use msgpacknet::*;
-    /// # let server = Node::new(Box::new(tests::DummyCallback::new(0, true)));
+    /// # let server = Node::new(Box::new(SimpleCallback::<(), u64>::new(0)));
     /// # assert!(server.open("localhost:0").is_ok());
-    /// # let client_callback = tests::DummyCallback::new(1, false);
+    /// # let client_callback = SimpleCallback::<(), u64>::new(1);
     /// # let callback = client_callback.clone();
     /// let node = Node::new(Box::new(callback));
     /// assert!(node.open("0.0.0.0:0").is_ok());

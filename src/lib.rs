@@ -7,18 +7,18 @@
 //!
 //! The main struct of this crate is [`Node`](struct.Node.html) which can be parametrized:
 //!
-//! * `Message` - The nodes using this crate communicate via messages that conform to the
-//! [`Message`](trait.Message.html) trait. These messages are serialized using `serde` to the
+//! * [`Message`](trait.Message.html) - The nodes using this crate communicate via messages that
+//! conform to the `Message` trait. These messages are serialized using `serde` to the
 //! efficient MessagePack format.
 //!
-//! * `NodeId` - This crate identifies and distinguishes nodes based on their
-//! [`NodeId`](trait.NodeId.html). It is required that all communicating nodes have different ids.
+//! * [`NodeId`](trait.NodeId.html) - This crate identifies and distinguishes nodes based on their
+//! `NodeId`. It is required that all communicating nodes have different ids.
 //! Therefore the node ids should be unique. This can be achieved by using the ip address and port
 //! number of the main listening socket. Alternatively, a large random number can be used (128 bit
 //! should be enough to expect uniqueness).
 //!
-//! * `InitMsg` - The first message exchanged on all connections uses the
-//! [`InitMsg`](trait.InitMsg.html) trait instead of `Message`. This first message must include the
+//! * [`InitMsg`](trait.InitMsg.html) - The first message exchanged on all connections uses the
+//! `InitMsg` trait instead of `Message`. This first message must include the
 //! `NodeId` of the remote node to identify it.
 //!
 //! # Low-level protocol
@@ -42,9 +42,11 @@ extern crate time;
 
 mod stats;
 mod socket;
+mod simple;
 
 #[doc(hidden)]
 #[cfg(not(build="release"))]
 pub mod tests;
 
+pub use simple::{SimpleCallback, SimpleCallbackEvent};
 pub use socket::{NodeStats, ConnectionStats, Node, Message, InitMsg, Callback, NodeId, Error};
