@@ -97,14 +97,14 @@
 //! node.send(peer_id, &msg).expect("Failed to send");
 //! ```
 //!
-//! ...and received via [`callback.recv()`](struct.SimpleCallback.html#method.recv).
+//! ...and received via [`callback.receive()`](struct.SimpleCallback.html#method.receive).
 //!
 //! ```
 //! # use msgpacknet::*;
 //! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
 //! # node.send(node.node_id(), &()).expect("Failed to send");
-//! let reply = callback.recv();
+//! let reply = callback.receive();
 //! ```
 
 //#![cfg_attr(test, feature(test))]

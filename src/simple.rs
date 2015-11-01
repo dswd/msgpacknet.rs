@@ -47,7 +47,7 @@ impl<M, N> SimpleCallback<M, N> {
     ///
     /// This method takes the oldest event from the queue and returns it. If the queue is empty,
     /// this call blocks until an event is received.
-    pub fn recv(&self) -> SimpleCallbackEvent<M, N> {
+    pub fn receive(&self) -> SimpleCallbackEvent<M, N> {
         let mut lock = self.0.msgs.lock().expect("Lock poisoned");
         while lock.is_empty() {
             lock = self.0.waiter.wait(lock).expect("Lock poisoned");
