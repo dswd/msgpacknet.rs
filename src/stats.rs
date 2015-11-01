@@ -1,4 +1,4 @@
-use std::io::{Write, Read, Result};
+use std::io::{self, Write, Read};
 use std::time::Duration;
 use std::sync::{Arc, RwLock};
 
@@ -66,13 +66,13 @@ impl<T> StatWriter<T> {
 }
 
 impl<T: Write> Write for StatWriter<T> {
-    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let bytes = try!(self.inner.write(buf));
         self.stats.write().expect("Lock poisoned").update(bytes);
         Ok(bytes)
     }
 
-    fn flush(&mut self) -> Result<()> {
+    fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
 }
@@ -94,7 +94,7 @@ impl<T> StatReader<T> {
 }
 
 impl<T: Read> Read for StatReader<T> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes = try!(self.inner.read(buf));
         self.stats.write().expect("Lock poisoned").update(bytes);
         Ok(bytes)

@@ -11,8 +11,7 @@ use std::hash::Hash;
 use std::mem;
 use std::time::Duration;
 use std::thread::{self, JoinHandle};
-use std::io::Error as IoError;
-use std::io::BufWriter;
+use std::io::{self, BufWriter};
 
 use super::stats::{Stats, StatReader, StatWriter};
 
@@ -48,10 +47,10 @@ pub enum Error<N> where N: NodeId {
     AlreadyClosed,
 
     /// Failed to open a server socket
-    OpenError(IoError),
+    OpenError(io::Error),
 
     /// Failed to establish a connection
-    ConnectionError(IoError),
+    ConnectionError(io::Error),
 
     /// Failed to send a message
     SendError,
@@ -66,7 +65,7 @@ pub enum Error<N> where N: NodeId {
     ConnectionAborted,
 
     /// Failed to close a socket
-    CloseError(IoError)
+    CloseError(io::Error)
 }
 
 
