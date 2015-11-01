@@ -49,10 +49,9 @@ impl<M, N> SimpleCallback<M, N> {
     /// this call blocks until an event is received.
     pub fn recv(&self) -> SimpleCallbackEvent<M, N> {
         let mut lock = self.0.msgs.lock().expect("Lock poisoned");
-        if lock.len() > 0 {
-            return lock.pop_front().unwrap();
+        while lock.is_empty() {
+            lock = self.0.waiter.wait(lock).expect("Lock poisoned");
         }
-        let mut lock = self.0.waiter.wait(lock).expect("Lock poisoned");
         lock.pop_front().unwrap()
     }
 }
