@@ -3,6 +3,8 @@ use super::*;
 use std::sync::{Condvar, Mutex, Arc};
 use std::collections::VecDeque;
 
+use rand::{self, Rand};
+
 
 /// The enum used for events
 #[derive(Debug, PartialEq)]
@@ -30,16 +32,6 @@ pub struct SimpleCallbackInner<M, N> {
 /// * It uses the node id as an initialization message.
 /// * It accepts all incoming connections.
 /// * It stores all events in a queue of [`SimpleCallbackEvent`](enum.SimpleCallbackEvent.html).
-///
-/// # Examples
-/// ```
-/// # use msgpacknet::*;
-/// # type M = ();
-/// # type N = u64;
-/// # let node_id = 0;
-/// let callback = SimpleCallback::<M, N>::new(node_id);
-/// let node = Node::new(Box::new(callback.clone()));
-/// ```
 #[derive(Clone)]
 pub struct SimpleCallback<M, N>(Arc<SimpleCallbackInner<M, N>>);
 
@@ -64,6 +56,13 @@ impl<M, N> SimpleCallback<M, N> {
         lock.pop_front().unwrap()
     }
 }
+
+impl <M, N> SimpleCallback<M, N> where N: Rand {
+    pub fn with_random_id() -> Self {
+        SimpleCallback::new(rand::random())
+    }
+}
+
 
 impl<M: Message, N: NodeId> Callback<M, N, N> for SimpleCallback<M, N> {
     fn node_id(&self, _node: &Node<M, N, N>) -> N {

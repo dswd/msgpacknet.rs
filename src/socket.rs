@@ -206,13 +206,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// The only parameter `callback` will be used to communicate with the caller.
     /// The result of this call is a guard that closes the node if dropped.
-    ///
-    /// # Examples
-    /// ```
-    /// # use msgpacknet::*;
-    /// # let callback = SimpleCallback::<(), u64>::new(0);
-    /// let node = Node::new(Box::new(callback));
-    /// ```
     pub fn new(callback: Box<Callback<M, N, I>>) -> CloseGuard<M, N, I> {
         CloseGuard(Node(Arc::new(NodeInner{
             callback: callback,
@@ -226,14 +219,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// This method will open a new server listening to the given address. A dedicated thread will
     /// be started to handle incoming connections.
-    ///
-    /// # Examples
-    /// ```
-    /// # use msgpacknet::*;
-    /// # let callback = SimpleCallback::<(), u64>::new(0);
-    /// let node = Node::new(Box::new(callback));
-    /// assert!(node.open("0.0.0.0:0").is_ok());
-    /// ```
     pub fn open<A: ToSocketAddrs>(&self, addr: A) -> Result<(), Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
@@ -248,16 +233,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     }
 
     /// The addresses of this node
-    ///
-    /// # Examples
-    /// ```
-    /// # use msgpacknet::*;
-    /// # let callback = SimpleCallback::<(), u64>::new(0);
-    /// let node = Node::new(Box::new(callback));
-    /// assert!(node.open("0.0.0.0:0").is_ok());
-    /// let addresses = node.addresses();
-    /// assert_eq!(addresses.len(), 1);
-    /// ```
     pub fn addresses(&self) -> Vec<SocketAddr> {
         let mut addrs = Vec::new();
         for &(ref sock, _) in &self.sockets.lock().expect("Lock poisoned") as &Vec<(Arc<TcpListener>, _)> {
@@ -266,7 +241,8 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         addrs
     }
 
-    fn node_id(&self) -> N {
+    /// The id of this node as obtained from the callback
+    pub fn node_id(&self) -> N {
         self.callback.node_id(&self)
     }
 
@@ -278,11 +254,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         self.callback.handle_init_msg(&self, &init)
     }
 
-    fn connection_timeout(&self) -> Duration {
+    /// The connection timeout as obtained from the callback
+    pub fn connection_timeout(&self) -> Duration {
         self.callback.connection_timeout(&self)
     }
 
-    fn stats_halflife_time(&self) -> Duration {
+    /// The statistics halflife time as obtained from the callback
+    pub fn stats_halflife_time(&self) -> Duration {
         self.callback.stats_halflife_time(&self)
     }
 
@@ -338,23 +316,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// serde and the node must be connected to the destination.
     /// It is possible to send messages to the node itself by using its address.
     /// If no connection to the destination exists, an error is returned.
-    ///
-    /// # Examples
-    /// ```
-    /// # use msgpacknet::*;
-    /// # let server = Node::new(Box::new(SimpleCallback::<(), u64>::new(0)));
-    /// # assert!(server.open("localhost:0").is_ok());
-    /// # let client_callback = SimpleCallback::<(), u64>::new(1);
-    /// # let callback = client_callback.clone();
-    /// let node = Node::new(Box::new(callback));
-    /// assert!(node.open("0.0.0.0:0").is_ok());
-    /// # let server_addr = server.addresses()[0];
-    /// assert!(node.connect(server_addr).is_ok());
-    /// # assert_eq!(client_callback.recv(), SimpleCallbackEvent::Connected(0));
-    /// # let server_id = 0;
-    /// # let msg = &();
-    /// assert!(node.send(server_id, msg).is_ok());
-    /// ```
     #[inline]
     pub fn send(&self, dst: N, msg: &M) -> Result<(), Error<N>> {
         if dst == self.node_id() {
@@ -380,19 +341,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// Note 2: It is possible to connect the node to itself. However, messages will just be
     /// short-circuited and the connection will not be used and closed after the timeout.
-    ///
-    /// # Examples
-    /// ```
-    /// # use msgpacknet::*;
-    /// # let server = Node::new(Box::new(SimpleCallback::<(), u64>::new(0)));
-    /// # assert!(server.open("localhost:0").is_ok());
-    /// # let client_callback = SimpleCallback::<(), u64>::new(1);
-    /// # let callback = client_callback.clone();
-    /// let node = Node::new(Box::new(callback));
-    /// assert!(node.open("0.0.0.0:0").is_ok());
-    /// # let server_addr = server.addresses()[0];
-    /// assert!(node.connect(server_addr).is_ok());
-    /// ```
     #[inline]
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<N, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
