@@ -13,7 +13,7 @@
 //!
 //! * [`NodeId`](trait.NodeId.html) - This crate identifies and distinguishes nodes based on their
 //! `NodeId`. It is required that all communicating nodes have different ids.
-//! Therefore the node ids should be unique. This can be achieved by using the ip address and port
+//! Therefore the node ids should be unique. This can be achieved by using the IP address and port
 //! number of the main listening socket. Alternatively, a large random number can be used (128 bit
 //! should be enough to expect uniqueness).
 //!

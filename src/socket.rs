@@ -35,7 +35,7 @@ impl<T> NodeId for T where T: Serialize + Deserialize + Send + Sync + Debug + Cl
 /// The trait used for initialization messages
 ///
 /// This is the type of message that will be exchanged during the initialization phase.
-/// It needs to contain the [`NodeId`](trait.NodeId.html) of the sending node to indetify it.
+/// It needs to contain the [`NodeId`](trait.NodeId.html) of the sending node to identify it.
 /// This trait is implemented automatically for all types that fulfill the requirements.
 pub trait InitMessage: Serialize + Deserialize + Send + Sync + Clone + 'static {}
 impl<T> InitMessage for T where T: Serialize + Deserialize + Send + Sync + Clone + 'static {}
@@ -130,7 +130,7 @@ pub trait Callback<M: Message, N: NodeId, I: InitMessage>: Send + Sync {
         Duration::from_secs(60)
     }
 
-    /// The statistics halflife time
+    /// The statistics half-life time
     ///
     /// This value is used as a parameter for the rolling average statistics of sending and
     /// receiving rates. Shorter durations react faster to changes and longer durations result in
@@ -144,8 +144,8 @@ pub trait Callback<M: Message, N: NodeId, I: InitMessage>: Send + Sync {
 /// A guard that closes the node when dropped.
 ///
 /// Implementation details require the node to exist in multiple reference counted copies.
-/// Therefore this wrapper is needed to implement the drop dehavior.
-/// Except for this drop behavior this stuct can be used like the node struct that it encapsulates.
+/// Therefore this wrapper is needed to implement the drop behavior.
+/// Except for this drop behavior this struct can be used like the node struct that it encapsulates.
 pub struct CloseGuard<M: Message, N: NodeId, I: InitMessage>(Node<M, N, I>);
 
 impl<M: Message, N: NodeId, I: InitMessage> Drop for CloseGuard<M, N, I> {
@@ -219,7 +219,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// This method will open a new server listening to the given address. A dedicated thread will
     /// be started to handle incoming connections. The node can listen on multiple addresses.
-    /// The result of this method, if successfull, is the actual address used.
+    /// The result of this method, if successful, is the actual address used.
     ///
     /// Note: a port of `0` has the special meaning of taking a random free port.
     pub fn listen<A: ToSocketAddrs>(&self, addr: A) -> Result<SocketAddr, Error<N>> {
@@ -276,7 +276,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         self.callback.connection_timeout(&self)
     }
 
-    /// The statistics halflife time as obtained from the callback
+    /// The statistics half-life time as obtained from the callback
     pub fn stats_halflife_time(&self) -> Duration {
         self.callback.stats_halflife_time(&self)
     }
@@ -330,7 +330,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// Send a message
     ///
     /// This method sends a message to the given destination. The message must be encodable using
-    /// serde and the node must be connected to the destination.
+    /// `serde` and the node must be connected to the destination.
     /// It is possible to send messages to the node itself by using its address.
     /// If no connection to the destination exists, an error is returned.
     #[inline]
