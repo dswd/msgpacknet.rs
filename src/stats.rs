@@ -4,7 +4,6 @@ use std::sync::{Arc, RwLock};
 
 use time;
 
-
 fn now_as_float() -> f64 {
     let t = time::get_time();
     t.sec as f64 + t.nsec as f64 * 0.000000001

@@ -47,8 +47,8 @@ impl Callback<u64, u64, u64> for DummyCallback {
         self.0.id
     }
 
-    fn handle_init_msg(&self, _node: &Node<u64, u64, u64>, id: &u64) -> Result<u64, Error<u64>> {
-        Ok(*id)
+    fn handle_init_msg(&self, _node: &Node<u64, u64, u64>, id: &u64) -> Option<u64> {
+        Some(*id)
     }
 
     fn connection_timeout(&self, _node: &Node<u64, u64, u64>) -> Duration {
@@ -79,8 +79,7 @@ impl Callback<u64, u64, u64> for DummyCallback {
 #[test]
 fn node_create() {
     let callback = DummyCallback::new(0, false);
-    let node = Node::new(Box::new(callback));
-    assert!(node.close().is_ok());
+    let _ = Node::new(Box::new(callback));
 }
 
 #[test]
@@ -90,7 +89,6 @@ fn node_open() {
     assert!(node.open("localhost:0").is_ok());
     let addrs = node.addresses();
     assert_eq!(addrs.len(), 1);
-    assert!(node.close().is_ok());
 }
 
 #[bench]
@@ -103,7 +101,6 @@ fn node_send_self(b: &mut Bencher) {
         assert_eq!(callback.recv(), Event::Msg(0, 42))
     });
     assert!(!node.is_connected(&0));
-    assert!(node.close().is_ok());
 }
 
 #[test]
@@ -117,8 +114,6 @@ fn node_connect() {
     assert!(client.connect(server.addresses()[0]).is_ok());
     assert!(client.is_connected(&0));
     assert_eq!(client_callback.recv(), Event::Connected(0));
-    assert!(client.close().is_ok());
-    assert!(server.close().is_ok());
 }
 
 #[bench]
@@ -134,6 +129,4 @@ fn node_send_remote(b: &mut Bencher) {
         assert!(client.send(0, &42).is_ok());
         assert_eq!(client_callback.recv(), Event::Msg(0, 42))
     });
-    assert!(client.close().is_ok());
-    assert!(server.close().is_ok());
 }
