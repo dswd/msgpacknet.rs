@@ -39,17 +39,15 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! let callback = SimpleCallback::<(), u64>::with_random_id();
-//! # let node = Node::new(Box::new(callback.clone()));
+//! let callback = SimpleCallback::<(), (u64, u64)>::with_random_id();
 //! ```
 //!
 //! Afterwards, the node can be created with a boxed copy of the callback as parameter.
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<_, u64>::with_random_id();
+//! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! let node = Node::new(Box::new(callback.clone()));
-//! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
 //! Then, sockets can be opened for listening and accepting connections.
@@ -103,9 +101,7 @@
 //! # use msgpacknet::*;
 //! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
-//! # let peer_id = node.node_id();
-//! # let msg = ();
-//! # node.send(peer_id, &msg).expect("Failed to send");
+//! # node.send(node.node_id(), &()).expect("Failed to send");
 //! let reply = callback.recv();
 //! ```
 
