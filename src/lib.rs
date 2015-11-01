@@ -1,4 +1,4 @@
-//! A networking layer based on MsgPack messages.
+//! A networking layer based on MessagePack messages.
 //!
 //! This crate provides an abstraction layer above TCP that uses
 //! [MessagePack](http://www.msgpack.org) encoded messages instead of pure byte streams.
