@@ -68,7 +68,9 @@
 //! # use msgpacknet::*;
 //! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
+//! # node.listen_defaults().expect("Failed to bind");
 //! println!("Addresses: {:?}", node.addresses());
+//! let addr = node.addresses()[0];
 //! ```
 //!
 //! Connections to other nodes can be established via
