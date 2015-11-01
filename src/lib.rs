@@ -17,19 +17,19 @@
 //! number of the main listening socket. Alternatively, a large random number can be used (128 bit
 //! should be enough to expect uniqueness).
 //!
-//! * [`InitMsg`](trait.InitMsg.html) - The first message exchanged on all connections uses the
-//! `InitMsg` trait instead of `Message`. This first message must include the
+//! * [`InitMessage`](trait.InitMessage.html) - The first message exchanged on all connections uses
+//! the `InitMessage` trait instead of `Message`. This first message must include the
 //! `NodeId` of the remote node to identify it.
 //!
 //! # Low-level protocol
-//! When establishing a new connection (either incoming or outgoing), first an `InitMsg` is sent to
-//! the remote node and then the initialization message is read from that node. After identifying
-//! the remote node the connection is either rejected and closed or accepted and added to the
-//! connection registry.
+//! When establishing a new connection (either incoming or outgoing), first an `InitMessage` is
+//! sent to the remote node and then the initialization message is read from that node.
+//! After identifying the remote node the connection is either rejected and closed or accepted and
+//! added to the connection registry.
 //!
 //! When established, the connection can be used to send multiple messages of the `Message` type.
 //!
-//! When idle for a certain timeout or when closing the node by dropping its JoinGuard, the
+//! When idle for a certain timeout or when closing the node by dropping its `DropGuard`, the
 //! connection is closed.
 //!
 //! # Callbacks
@@ -51,4 +51,4 @@ mod simple;
 #[cfg(test)] mod tests;
 
 pub use simple::{SimpleCallback, SimpleCallbackEvent};
-pub use socket::{NodeStats, ConnectionStats, Node, Message, InitMsg, Callback, NodeId, Error};
+pub use socket::{NodeStats, ConnectionStats, Node, Message, InitMessage, Callback, NodeId, Error};

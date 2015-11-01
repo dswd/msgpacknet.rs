@@ -35,10 +35,10 @@ impl<T> NodeId for T where T: Serialize + Deserialize + Send + Sync + Debug + Cl
 /// The trait used for initialization messages
 ///
 /// This is the type of message that will be exchanged during the initialization phase.
-/// It needs to contain the [NodeId](trait.NodeId.html) of the sending node to indetify it.
+/// It needs to contain the [`NodeId`](trait.NodeId.html) of the sending node to indetify it.
 /// This trait is implemented automatically for all types that fulfill the requirements.
-pub trait InitMsg: Serialize + Deserialize + Send + Sync + Clone + 'static {}
-impl<T> InitMsg for T where T: Serialize + Deserialize + Send + Sync + Clone + 'static {}
+pub trait InitMessage: Serialize + Deserialize + Send + Sync + Clone + 'static {}
+impl<T> InitMessage for T where T: Serialize + Deserialize + Send + Sync + Clone + 'static {}
 
 
 /// The error type used througout the crate
@@ -71,7 +71,7 @@ pub enum Error<N> where N: NodeId {
 
 
 /// The trait used as callback
-pub trait Callback<M: Message, N: NodeId, I: InitMsg>: Send + Sync {
+pub trait Callback<M: Message, N: NodeId, I: InitMessage>: Send + Sync {
     /// The identifier of the current node
     fn node_id(&self, node: &Node<M, N, I>) -> N;
 
@@ -146,15 +146,15 @@ pub trait Callback<M: Message, N: NodeId, I: InitMsg>: Send + Sync {
 /// Implementation details require the node to exist in multiple reference counted copies.
 /// Therefore this wrapper is needed to implement the drop dehavior.
 /// Except for this drop behavior this stuct can be used like the node struct that it encapsulates.
-pub struct CloseGuard<M: Message, N: NodeId, I: InitMsg>(Node<M, N, I>);
+pub struct CloseGuard<M: Message, N: NodeId, I: InitMessage>(Node<M, N, I>);
 
-impl<M: Message, N: NodeId, I: InitMsg> Drop for CloseGuard<M, N, I> {
+impl<M: Message, N: NodeId, I: InitMessage> Drop for CloseGuard<M, N, I> {
     fn drop(&mut self) {
         self.close().expect("Failed to close node");
     }
 }
 
-impl<M: Message, N: NodeId, I: InitMsg> Deref for CloseGuard<M, N, I> {
+impl<M: Message, N: NodeId, I: InitMessage> Deref for CloseGuard<M, N, I> {
     type Target = Node<M, N, I>;
 
     fn deref(&self) -> &Self::Target {
@@ -171,7 +171,7 @@ pub struct NodeStats<N: NodeId> {
 
 
 /// The inner struct that holds all node data
-pub struct NodeInner<M: Message, N: NodeId, I: InitMsg> {
+pub struct NodeInner<M: Message, N: NodeId, I: InitMessage> {
     callback: Box<Callback<M, N, I>>,
     sockets: Mutex<Vec<(Arc<TcpListener>, JoinHandle<Result<(), Error<N>>>)>>,
     connections: RwLock<HashMap<N, Connection<M, N, I>>>,
@@ -188,12 +188,12 @@ pub struct NodeInner<M: Message, N: NodeId, I: InitMsg> {
 ///   messages that are exchanged.
 /// * `N` a type implementing the [`NodeId`](trait.NodeId.html) trait that is used to identify and
 ///   distinguish nodes.
-/// * `I` a type implementing the [`InitMsg`](trait.InitMsg.html) trait that is used for the first
-///   initialization message exchanged on any connection.
+/// * `I` a type implementing the [`InitMessage`](trait.InitMessage.html) trait that is used for
+///   the first initialization message exchanged on any connection.
 #[derive(Clone)]
-pub struct Node<M: Message, N: NodeId, I: InitMsg>(Arc<NodeInner<M, N, I>>);
+pub struct Node<M: Message, N: NodeId, I: InitMessage>(Arc<NodeInner<M, N, I>>);
 
-impl<M: Message, N: NodeId, I: InitMsg> Deref for Node<M, N, I> {
+impl<M: Message, N: NodeId, I: InitMessage> Deref for Node<M, N, I> {
     type Target = NodeInner<M, N, I>;
 
     fn deref(&self) -> &Self::Target {
@@ -201,7 +201,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Deref for Node<M, N, I> {
     }
 }
 
-impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
+impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// Create a new node
     ///
     /// The only parameter `callback` will be used to communicate with the caller.
@@ -450,7 +450,7 @@ pub struct ConnectionStats {
 }
 
 
-pub struct ConnectionInner<M: Message, N: NodeId, I: InitMsg> {
+pub struct ConnectionInner<M: Message, N: NodeId, I: InitMessage> {
     server: Node<M, N, I>,
     socket: Mutex<TcpStream>,
     writer: Mutex<StatWriter<TcpStream>>,
@@ -461,9 +461,9 @@ pub struct ConnectionInner<M: Message, N: NodeId, I: InitMsg> {
 }
 
 #[derive(Clone)]
-pub struct Connection<M: Message, N: NodeId, I: InitMsg>(Arc<ConnectionInner<M, N, I>>);
+pub struct Connection<M: Message, N: NodeId, I: InitMessage>(Arc<ConnectionInner<M, N, I>>);
 
-impl<M: Message, N: NodeId, I: InitMsg> Deref for Connection<M, N, I> {
+impl<M: Message, N: NodeId, I: InitMessage> Deref for Connection<M, N, I> {
     type Target = ConnectionInner<M, N, I>;
 
     fn deref(&self) -> &Self::Target {
@@ -471,7 +471,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Deref for Connection<M, N, I> {
     }
 }
 
-impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
+impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
     fn new(server: Node<M, N, I>, mut socket: TcpStream) -> Result<Self, Error<N>> {
         try!(socket.set_nodelay(true).map_err(|err| Error::ConnectionError(err)));
         try!(socket.set_read_timeout(Some(server.connection_timeout())).map_err(|err| Error::ConnectionError(err)));
