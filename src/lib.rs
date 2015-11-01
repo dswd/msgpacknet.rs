@@ -39,19 +39,16 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! let callback = SimpleCallback::with_random_id();
+//! let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
-//! # let _dummy: u64 = node.node_id();
-//! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
 //! Afterwards, the node can be created with a boxed copy of the callback as parameter.
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::with_random_id();
+//! # let callback = SimpleCallback::<_, u64>::with_random_id();
 //! let node = Node::new(Box::new(callback.clone()));
-//! # let _dummy: u64 = node.node_id();
 //! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
@@ -61,11 +58,9 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::with_random_id();
+//! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
-//! # let _dummy: u64 = node.node_id();
 //! node.listen_defaults().expect("Failed to bind");
-//! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
 //! The actual address can be obtained using
@@ -73,12 +68,9 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::with_random_id();
+//! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
-//! # let _dummy: u64 = node.node_id();
-//! # node.listen_defaults().expect("Failed to bind");
 //! println!("Addresses: {:?}", node.addresses());
-//! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
 //! Connections to other nodes can be established via
@@ -87,37 +79,30 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::with_random_id();
+//! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
-//! # let _dummy: u64 = node.node_id();
 //! # node.listen_defaults().expect("Failed to bind");
 //! # let addr = node.addresses()[0];
 //! let peer_id = node.connect(addr).expect("Failed to connect");
-//! # node.send(peer_id, &()).expect("Failed to send");
 //! ```
 //!
 //! Then, messages can be sent via [`node.send(...)`](struct.Node.html#method.send)...
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::with_random_id();
+//! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
-//! # let _dummy: u64 = node.node_id();
-//! # node.listen_defaults().expect("Failed to bind");
 //! # let peer_id = node.node_id();
 //! # let msg = ();
 //! node.send(peer_id, &msg).expect("Failed to send");
-//! let reply = callback.recv();
 //! ```
 //!
 //! ...and received via [`callback.recv()`](struct.SimpleCallback.html#method.recv).
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::with_random_id();
+//! # let callback = SimpleCallback::<(), u64>::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
-//! # let _dummy: u64 = node.node_id();
-//! # node.listen_defaults().expect("Failed to bind");
 //! # let peer_id = node.node_id();
 //! # let msg = ();
 //! # node.send(peer_id, &msg).expect("Failed to send");
