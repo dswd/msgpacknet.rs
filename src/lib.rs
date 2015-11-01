@@ -42,16 +42,20 @@ pub enum Error<N> where N: NodeId {
     ConnectError(IoError),
     CloseServer(IoError),
     CloseConnection(IoError),
+    DuplicateConnection(N),
+    InvalidProtocol
 }
 
 pub trait Callback<M: Message, N: NodeId, I: InitMsg>: Send + Sync {
     fn node_id(&self, &Node<M, N, I>) -> N;
     fn create_init_msg(&self, &Node<M, N, I>) -> I;
-    fn connection_timeout(&self, &Node<M, N, I>) -> Duration;
-    fn node_id_from_init_msg(&self, &Node<M, N, I>, &I) -> N;
+    fn handle_init_msg(&self, &Node<M, N, I>, &I) -> Result<N, Error<N>>;
     fn handle_message(&self, &Node<M, N, I>, &N, M);
     fn on_connected(&self, &Node<M, N, I>, &N);
     fn on_disconnected(&self, &Node<M, N, I>, &N);
+    fn connection_timeout(&self, &Node<M, N, I>) -> Duration {
+        Duration::from_secs(60)
+    }
 }
 
 pub struct CloseGuard<M: Message, N: NodeId, I: InitMsg>(Node<M, N, I>);
@@ -123,8 +127,8 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
         self.callback.create_init_msg(&self)
     }
 
-    fn node_id_from_init_msg(&self, init: &I) -> N {
-        self.callback.node_id_from_init_msg(&self, &init)
+    fn handle_init_msg(&self, init: &I) -> Result<N, Error<N>> {
+        self.callback.handle_init_msg(&self, &init)
     }
 
     fn connection_timeout(&self) -> Duration {
@@ -239,7 +243,7 @@ impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
             let mut reader = rmp_serde::Deserializer::new(&socket);
             try!(I::deserialize(&mut reader).map_err(|_| Error::DeserializeError))
         };
-        let node_id = server.node_id_from_init_msg(&init);
+        let node_id = try!(server.handle_init_msg(&init));
         Ok(Connection(Arc::new(ConnectionInner{server: server, socket: RwLock::new(socket), node_id: node_id})))
     }
 

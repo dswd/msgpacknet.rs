@@ -47,8 +47,8 @@ impl Callback<u64, u64, u64> for DummyCallback {
         self.0.id
     }
 
-    fn node_id_from_init_msg(&self, _node: &Node<u64, u64, u64>, id: &u64) -> u64 {
-        *id
+    fn handle_init_msg(&self, _node: &Node<u64, u64, u64>, id: &u64) -> Result<u64, Error<u64>> {
+        Ok(*id)
     }
 
     fn connection_timeout(&self, _node: &Node<u64, u64, u64>) -> Duration {
