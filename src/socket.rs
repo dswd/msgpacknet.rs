@@ -14,6 +14,9 @@ use std::thread::{self, JoinHandle};
 use std::io::Error as IoError;
 use std::io::BufWriter;
 
+use super::stats::{Stats, StatReader, StatWriter};
+
+
 pub trait Message: Serialize + Deserialize + Send + Sync + Clone + 'static {}
 impl<T> Message for T where T: Serialize + Deserialize + Send + Sync + Clone + 'static {}
 
@@ -49,6 +52,9 @@ pub trait Callback<M: Message, N: NodeId, I: InitMsg>: Send + Sync {
     fn connection_timeout(&self, &Node<M, N, I>) -> Duration {
         Duration::from_secs(60)
     }
+    fn stats_halflife_time(&self, &Node<M, N, I>) -> Duration {
+        Duration::from_secs(60)
+    }
 }
 
 pub struct CloseGuard<M: Message, N: NodeId, I: InitMsg>(Node<M, N, I>);
@@ -65,6 +71,10 @@ impl<M: Message, N: NodeId, I: InitMsg> Deref for CloseGuard<M, N, I> {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
+}
+
+pub struct NodeStats<N: NodeId> {
+    pub connections: HashMap<N, ConnectionStats>
 }
 
 
@@ -128,6 +138,10 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
         self.callback.connection_timeout(&self)
     }
 
+    fn stats_halflife_time(&self) -> Duration {
+        self.callback.stats_halflife_time(&self)
+    }
+
     fn handle_message(&self, src: &N, msg: M) {
         self.callback.handle_message(&self, &src, msg)
     }
@@ -153,6 +167,14 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
 
     fn get_connections(&self) -> Vec<Connection<M, N, I>> {
         self.connections.read().expect("Lock poisoned").values().map(|c| c.clone()).collect()
+    }
+
+    pub fn stats(&self) -> NodeStats<N> {
+        let mut stats = NodeStats{connections: HashMap::new()};
+        for (id, con) in self.connections.read().expect("Lock poisoned").iter() {
+            stats.connections.insert(id.clone(), con.stats());
+        }
+        stats
     }
 
     fn run_server(&self, socket: Arc<TcpListener>) -> Result<(), Error<N>> {
@@ -206,9 +228,23 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
 }
 
 
+pub struct ConnectionStats {
+    pub write_total: u64,
+    pub write_rate: f64,
+    pub write_idle: Duration,
+    pub read_total: u64,
+    pub read_rate: f64,
+    pub read_idle: Duration
+}
+
+
 pub struct ConnectionInner<M: Message, N: NodeId, I: InitMsg> {
     server: Node<M, N, I>,
-    socket: RwLock<TcpStream>,
+    socket: Mutex<TcpStream>,
+    writer: Mutex<StatWriter<TcpStream>>,
+    writer_stats: Arc<RwLock<Stats>>,
+    reader: Mutex<rmp_serde::Deserializer<StatReader<TcpStream>>>,
+    reader_stats: Arc<RwLock<Stats>>,
     node_id: N
 }
 
@@ -237,16 +273,42 @@ impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
             try!(I::deserialize(&mut reader).map_err(|_| Error::DeserializeError))
         };
         let node_id = try!(server.handle_init_msg(&init));
-        Ok(Connection(Arc::new(ConnectionInner{server: server, socket: RwLock::new(socket), node_id: node_id})))
+        let writer = StatWriter::new(socket.try_clone().expect("Failed to clone socket"), server.stats_halflife_time());
+        let writer_stats = writer.stats();
+        let input = StatReader::new(socket.try_clone().expect("Failed to clone socket"), server.stats_halflife_time());
+        let reader_stats = input.stats();
+        let reader = rmp_serde::Deserializer::new(input);
+        Ok(Connection(Arc::new(ConnectionInner{
+            server: server,
+            writer: Mutex::new(writer),
+            writer_stats: writer_stats,
+            reader: Mutex::new(reader),
+            reader_stats: reader_stats,
+            socket: Mutex::new(socket),
+            node_id: node_id
+        })))
     }
 
     fn node_id(&self) -> &N {
         &self.node_id
     }
 
+    fn stats(&self) -> ConnectionStats {
+        let reader_stats = self.reader_stats.read().expect("Lock poisoned");
+        let writer_stats = self.writer_stats.read().expect("Lock poisoned");
+        ConnectionStats{
+            write_total: writer_stats.total(),
+            write_rate: writer_stats.rate(),
+            write_idle: writer_stats.idle_time(),
+            read_total: reader_stats.total(),
+            read_rate: reader_stats.rate(),
+            read_idle: reader_stats.idle_time()
+        }
+    }
+
     fn send(&self, msg: &M) -> Result<(), Error<N>> {
-        let mut lock = self.socket.write().expect("Lock poisoned");
-        let mut bufwriter = BufWriter::new(&mut lock as &mut TcpStream);
+        let mut lock = self.writer.lock().expect("Lock poisoned");
+        let mut bufwriter = BufWriter::new(&mut lock as &mut StatWriter<TcpStream>);
         let mut writer = rmp_serde::Serializer::new(&mut bufwriter);
         msg.serialize(&mut writer).map_err(|_| Error::SerializeError)
     }
@@ -258,15 +320,14 @@ impl<M: Message, N: NodeId, I: InitMsg> Connection<M, N, I> {
     }
 
     fn run_inner(&self) -> Result<(), Error<N>> {
-        let input = self.socket.read().expect("Lock poisoned").try_clone().expect("Failed to clone socket");
-        let mut reader = rmp_serde::Deserializer::new(input);
+        let mut reader = self.reader.lock().expect("Lock poisoned");
         loop {
-            let msg = try!(M::deserialize(&mut reader).map_err(|_| Error::DeserializeError));
+            let msg = try!(M::deserialize(&mut reader as &mut rmp_serde::Deserializer<StatReader<TcpStream>>).map_err(|_| Error::DeserializeError));
             self.server.handle_message(&self.node_id, msg);
         }
     }
 
     fn close(&self) -> Result<(), Error<N>> {
-        Ok(try!(self.socket.read().expect("Lock poisoned").shutdown(Shutdown::Both).map_err(|err| Error::CloseConnection(err))))
+        Ok(try!(self.socket.lock().expect("Lock poisoned").shutdown(Shutdown::Both).map_err(|err| Error::CloseConnection(err))))
     }
 }
