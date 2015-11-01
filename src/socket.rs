@@ -253,7 +253,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         Ok(used_addr)
     }
 
-    /// Listen on the addresses `"0.0.0.0:0"` and `[::0]:0`
+    /// Listen on the addresses `"0.0.0.0:0"` and `"[::0]:0"`
     ///
     /// This will open sockets for IPv4 and IPv6 (see [`listen`](struct.Node.html#method.listen)
     /// for details).
