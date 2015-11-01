@@ -373,9 +373,13 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// it and adds the connection to the registry to be used for sending messages and spawns a
     /// thread to handle incoming messages.
     /// This method will only return after the connection has been fully established.
+    /// The result of the method on success is the node id of the new remote node.
     ///
     /// Note: This connection will automatically be closed when it becomes idle for longer than the
     /// [specified timeout](trait.Callback.html#method.connection_timeout).
+    ///
+    /// Note 2: It is possible to connect the node to itself. However, messages will just be
+    /// short-circuited and the connection will not be used and closed after the timeout.
     ///
     /// # Examples
     /// ```
@@ -390,15 +394,16 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// assert!(node.connect(server_addr).is_ok());
     /// ```
     #[inline]
-    pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<(), Error<N>> {
+    pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<N, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
         let sock = try!(TcpStream::connect(addr).map_err(|err| Error::ConnectionError(err)));
         let con = try!(Connection::new(self.clone(), sock));
+        let id = con.node_id().clone();
         self.add_connection(con.clone());
         thread::spawn(move || con.run());
-        Ok(())
+        Ok(id)
     }
 
     fn shutdown_socket(&self, socket: &TcpListener) -> Result<(), Error<N>> {
