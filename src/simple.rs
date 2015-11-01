@@ -62,7 +62,6 @@ impl <M, N> SimpleCallback<M, N> where N: Rand {
     }
 }
 
-
 impl<M: Message, N: NodeId> Callback<M, N, N> for SimpleCallback<M, N> {
     fn node_id(&self, _node: &Node<M, N, N>) -> N {
         self.0.id.clone()
@@ -89,5 +88,13 @@ impl<M: Message, N: NodeId> Callback<M, N, N> for SimpleCallback<M, N> {
     fn handle_message(&self, _node: &Node<M, N, N>, src: &N, msg: M) {
         self.0.msgs.lock().expect("Lock poisoned").push_back(SimpleCallbackEvent::Msg(src.clone(), msg));
         self.0.waiter.notify_all();
+    }
+}
+
+impl<M, N> Iterator for SimpleCallback<M, N> {
+    type Item = SimpleCallbackEvent<M, N>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.receive())
     }
 }
