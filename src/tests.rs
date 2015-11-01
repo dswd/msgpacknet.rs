@@ -7,13 +7,13 @@ use std::collections::VecDeque;
 
 
 #[derive(Debug, PartialEq)]
-enum Event {
+pub enum Event {
     Msg(u64, u64),
     Connected(u64),
     Disconnected(u64),
 }
 
-struct DummyCallbackInner {
+pub struct DummyCallbackInner {
     msgs: Mutex<VecDeque<Event>>,
     waiter: Condvar,
     id: u64,
@@ -21,14 +21,14 @@ struct DummyCallbackInner {
 }
 
 #[derive(Clone)]
-struct DummyCallback(Arc<DummyCallbackInner>);
+pub struct DummyCallback(Arc<DummyCallbackInner>);
 
 impl DummyCallback {
-    fn new(id: u64, bounce: bool) -> Self {
+    pub fn new(id: u64, bounce: bool) -> Self {
         DummyCallback(Arc::new(DummyCallbackInner{msgs: Mutex::new(VecDeque::new()), waiter: Condvar::new(), id: id, bounce: bounce}))
     }
 
-    fn recv(&self) -> Event {
+    pub fn recv(&self) -> Event {
         let mut lock = self.0.msgs.lock().expect("Lock poisoned");
         if lock.len() > 0 {
             return lock.pop_front().unwrap();

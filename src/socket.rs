@@ -113,6 +113,9 @@ pub trait Callback<M: Message, N: NodeId, I: InitMsg>: Send + Sync {
     ///
     /// Note: This method is called after the connection has been closed and unregistered,
     /// so it can't be used to send final messages on that connection.
+    ///
+    /// Note 2: This method will not be called if a duplicate connection to the same node is
+    /// closed.
     #[allow(unused_variables)]
     fn on_disconnected(&self, node: &Node<M, N, I>, id: &N) {
 
@@ -203,6 +206,13 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     ///
     /// The only parameter `callback` will be used to communicate with the caller.
     /// The result of this call is a guard that closes the node if dropped.
+    ///
+    /// # Examples
+    /// ```
+    /// # use msgpacknet::*;
+    /// # let callback = tests::DummyCallback::new(0, false);
+    /// let node = Node::new(Box::new(callback));
+    /// ```
     pub fn new(callback: Box<Callback<M, N, I>>) -> CloseGuard<M, N, I> {
         CloseGuard(Node(Arc::new(NodeInner{
             callback: callback,
@@ -216,6 +226,14 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     ///
     /// This method will open a new server listening to the given address. A dedicated thread will
     /// be started to handle incoming connections.
+    ///
+    /// # Examples
+    /// ```
+    /// # use msgpacknet::*;
+    /// # let callback = tests::DummyCallback::new(0, false);
+    /// let node = Node::new(Box::new(callback));
+    /// assert!(node.open("0.0.0.0:0").is_ok());
+    /// ```
     pub fn open<A: ToSocketAddrs>(&self, addr: A) -> Result<(), Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
@@ -230,6 +248,16 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     }
 
     /// The addresses of this node
+    ///
+    /// # Examples
+    /// ```
+    /// # use msgpacknet::*;
+    /// # let callback = tests::DummyCallback::new(0, false);
+    /// let node = Node::new(Box::new(callback));
+    /// assert!(node.open("0.0.0.0:0").is_ok());
+    /// let addresses = node.addresses();
+    /// assert_eq!(addresses.len(), 1);
+    /// ```
     pub fn addresses(&self) -> Vec<SocketAddr> {
         let mut addrs = Vec::new();
         for &(ref sock, _) in &self.sockets.lock().expect("Lock poisoned") as &Vec<(Arc<TcpListener>, _)> {
@@ -310,6 +338,24 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     /// serde and the node must be connected to the destination.
     /// It is possible to send messages to the node itself by using its address.
     /// If no connection to the destination exists, an error is returned.
+    ///
+    /// # Examples
+    /// ```
+    /// # use msgpacknet::*;
+    /// # let server = Node::new(Box::new(tests::DummyCallback::new(0, true)));
+    /// # assert!(server.open("localhost:0").is_ok());
+    /// # let client_callback = tests::DummyCallback::new(1, false);
+    /// # let callback = client_callback.clone();
+    /// let node = Node::new(Box::new(callback));
+    /// assert!(node.open("0.0.0.0:0").is_ok());
+    /// # let server_addr = server.addresses()[0];
+    /// assert!(node.connect(server_addr).is_ok());
+    /// # assert_eq!(client_callback.recv(), tests::Event::Connected(0));
+    /// # let server_id = 0;
+    /// # let msg = &42;
+    /// assert!(node.send(server_id, msg).is_ok());
+    /// # assert_eq!(client_callback.recv(), tests::Event::Msg(0, 42));
+    /// ```
     #[inline]
     pub fn send(&self, dst: N, msg: &M) -> Result<(), Error<N>> {
         if dst == self.node_id() {
@@ -331,6 +377,19 @@ impl<M: Message, N: NodeId, I: InitMsg> Node<M, N, I> {
     ///
     /// Note: This connection will automatically be closed when it becomes idle for longer than the
     /// [specified timeout](trait.Callback.html#method.connection_timeout).
+    ///
+    /// # Examples
+    /// ```
+    /// # use msgpacknet::*;
+    /// # let server = Node::new(Box::new(tests::DummyCallback::new(0, true)));
+    /// # assert!(server.open("localhost:0").is_ok());
+    /// # let client_callback = tests::DummyCallback::new(1, false);
+    /// # let callback = client_callback.clone();
+    /// let node = Node::new(Box::new(callback));
+    /// assert!(node.open("0.0.0.0:0").is_ok());
+    /// # let server_addr = server.addresses()[0];
+    /// assert!(node.connect(server_addr).is_ok());
+    /// ```
     #[inline]
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<(), Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
