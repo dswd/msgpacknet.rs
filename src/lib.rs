@@ -31,22 +31,24 @@
 //!
 //! When idle for a certain timeout or when closing the node by dropping its JoinGuard, the
 //! connection is closed.
+//!
+//! # Callbacks
+//! The [`Callback`](trait.Callback.html) trait is used by the node struct to retrieve informations
+//! and inform the caller of events and incoming messages. The
+//! [`SimpleCallback`](struct.SimpleCallback.html) struct provides a simple implementation.
 
 //#![cfg_attr(test, feature(test))]
-#![cfg_attr(not(build="release"), feature(test))]
+#![cfg_attr(test, feature(test))]
 extern crate serde;
 extern crate rmp_serde;
 extern crate net2;
 extern crate time;
-#[cfg(not(build="release"))] extern crate test;
+#[cfg(test)] extern crate test;
 
 mod stats;
 mod socket;
 mod simple;
-
-#[doc(hidden)]
-#[cfg(not(build="release"))]
-pub mod tests;
+#[cfg(test)] mod tests;
 
 pub use simple::{SimpleCallback, SimpleCallbackEvent};
 pub use socket::{NodeStats, ConnectionStats, Node, Message, InitMsg, Callback, NodeId, Error};
