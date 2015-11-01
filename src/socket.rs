@@ -240,6 +240,9 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// This will open sockets for IPv4 and IPv6 (see [`listen`](struct.Node.html#method.listen)
     /// for details).
+    ///
+    /// Note: This method will always open two new sockets, regardless of whether sockets are
+    /// already open.
     pub fn listen_defaults(&self) -> Result<(), Error<N>> {
         try!(self.listen("0.0.0.0:0"));
         try!(self.listen("[::0]:0"));

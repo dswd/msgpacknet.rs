@@ -56,7 +56,8 @@
 //! ```
 //!
 //! Then, sockets can be opened for listening and accepting connections.
-//! The method `listen_defaults()` can be used to listen on free ports on IPv4 and IPv6.
+//! The method [`node.listen_defaults()`](struct.Node.html#method.listen_defaults) can be used to
+//! listen on free ports on IPv4 and IPv6.
 //!
 //! ```
 //! # use msgpacknet::*;
@@ -67,7 +68,8 @@
 //! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
-//! The actual address can be obtained using `addresses()`.
+//! The actual address can be obtained using
+//! [`node.addresses()`](struct.Node.html#method.addresses).
 //!
 //! ```
 //! # use msgpacknet::*;
@@ -79,8 +81,9 @@
 //! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
-//! Connections to other nodes can be established via `connect`. The result of the call is the id
-//! of that peer.
+//! Connections to other nodes can be established via
+//! [`connect(...)`](struct.Node.html#method.connect). The result of the call is the id of that
+//! peer.
 //!
 //! ```
 //! # use msgpacknet::*;
@@ -93,7 +96,7 @@
 //! # node.send(peer_id, &()).expect("Failed to send");
 //! ```
 //!
-//! Then, messages can be sent via `node.send`...
+//! Then, messages can be sent via [`node.send(...)`](struct.Node.html#method.send)...
 //!
 //! ```
 //! # use msgpacknet::*;
@@ -107,7 +110,7 @@
 //! let reply = callback.recv();
 //! ```
 //!
-//! ...and received via `callback.recv`.
+//! ...and received via [`callback.recv()`](struct.SimpleCallback.html#method.recv).
 //!
 //! ```
 //! # use msgpacknet::*;
