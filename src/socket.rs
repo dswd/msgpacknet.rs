@@ -215,11 +215,14 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         })))
     }
 
-    /// Open a new server
+    /// Listen on the specified address
     ///
     /// This method will open a new server listening to the given address. A dedicated thread will
-    /// be started to handle incoming connections.
-    pub fn open<A: ToSocketAddrs>(&self, addr: A) -> Result<(), Error<N>> {
+    /// be started to handle incoming connections. The node can listen on multiple addresses.
+    /// The result of this method, if successfull, is the actual address used.
+    ///
+    /// Note: a port of `0` has the special meaning of taking a random free port.
+    pub fn listen<A: ToSocketAddrs>(&self, addr: A) -> Result<SocketAddr, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
@@ -227,8 +230,19 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         let server: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr).map_err(|err| Error::OpenError(err))));
         let cloned_self = self.clone();
         let cloned_server = server.clone();
+        let used_addr = server.local_addr().expect("Failed to get local address");
         let join = thread::spawn(move || cloned_self.run_server(cloned_server));
         servers.push((server, join));
+        Ok(used_addr)
+    }
+
+    /// Listen on the addresses `"0.0.0.0:0"` and `[::0]:0`
+    ///
+    /// This will open sockets for IPv4 and IPv6 (see [`listen`](struct.Node.html#method.listen)
+    /// for details).
+    pub fn listen_defaults(&self) -> Result<(), Error<N>> {
+        try!(self.listen("0.0.0.0:0"));
+        try!(self.listen("[::0]:0"));
         Ok(())
     }
 

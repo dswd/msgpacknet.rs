@@ -42,7 +42,7 @@ fn node_create() {
 fn node_open() {
     let callback = DummyCallback::new(0);
     let node = Node::new(Box::new(callback));
-    assert!(node.open("localhost:0").is_ok());
+    assert!(node.listen("localhost:0").is_ok());
     let addrs = node.addresses();
     assert_eq!(addrs.len(), 1);
 }
@@ -51,7 +51,7 @@ fn node_open() {
 fn node_send_self(b: &mut Bencher) {
     let callback = DummyCallback::new(0);
     let node = Node::new(Box::new(callback.clone()));
-    assert!(node.open("localhost:0").is_ok());
+    assert!(node.listen("localhost:0").is_ok());
     b.iter(|| {
         assert!(node.send(0, &42).is_ok());
         assert_eq!(callback.recv(), SimpleCallbackEvent::Msg(0, 42))
@@ -62,10 +62,10 @@ fn node_send_self(b: &mut Bencher) {
 #[test]
 fn node_connect() {
     let server = Node::new(Box::new(BouncerCallback::new(0)));
-    assert!(server.open("localhost:0").is_ok());
+    assert!(server.listen("localhost:0").is_ok());
     let client_callback = DummyCallback::new(1);
     let client = Node::new(Box::new(client_callback.clone()));
-    assert!(client.open("localhost:0").is_ok());
+    assert!(client.listen("localhost:0").is_ok());
     assert!(!client.is_connected(&0));
     assert!(client.connect(server.addresses()[0]).is_ok());
     assert!(client.is_connected(&0));
@@ -75,10 +75,10 @@ fn node_connect() {
 #[bench]
 fn node_send_remote(b: &mut Bencher) {
     let server = Node::new(Box::new(BouncerCallback::new(0)));
-    assert!(server.open("localhost:0").is_ok());
+    assert!(server.listen("localhost:0").is_ok());
     let client_callback = DummyCallback::new(1);
     let client = Node::new(Box::new(client_callback.clone()));
-    assert!(client.open("localhost:0").is_ok());
+    assert!(client.listen("localhost:0").is_ok());
     assert!(client.connect(server.addresses()[0]).is_ok());
     assert_eq!(client_callback.recv(), SimpleCallbackEvent::Connected(0));
     b.iter(|| {

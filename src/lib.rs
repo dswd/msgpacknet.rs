@@ -55,16 +55,15 @@
 //! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
-//! Then, sockets can be opened for listening and accepting connections. Using `"0.0.0.0:0"`,
-//! a free port can be opened on all IPv4 interfaces (`"[::1]:0"` will do the same for IPv6).
+//! Then, sockets can be opened for listening and accepting connections.
+//! The method `listen_defaults()` can be used to listen on free ports on IPv4 and IPv6.
 //!
 //! ```
 //! # use msgpacknet::*;
 //! # let callback = SimpleCallback::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
 //! # let _dummy: u64 = node.node_id();
-//! node.open("0.0.0.0:0").expect("Failed to bind");
-//! node.open("[::1]:0").expect("Failed to bind");
+//! node.listen_defaults().expect("Failed to bind");
 //! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
 //!
@@ -75,8 +74,7 @@
 //! # let callback = SimpleCallback::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
 //! # let _dummy: u64 = node.node_id();
-//! # node.open("0.0.0.0:0").expect("Failed to bind");
-//! # node.open("[::1]:0").expect("Failed to bind");
+//! # node.listen_defaults().expect("Failed to bind");
 //! println!("Addresses: {:?}", node.addresses());
 //! # node.send(node.node_id(), &()).expect("Failed to send");
 //! ```
@@ -89,8 +87,7 @@
 //! # let callback = SimpleCallback::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
 //! # let _dummy: u64 = node.node_id();
-//! # node.open("0.0.0.0:0").expect("Failed to bind");
-//! # node.open("[::1]:0").expect("Failed to bind");
+//! # node.listen_defaults().expect("Failed to bind");
 //! # let addr = node.addresses()[0];
 //! let peer_id = node.connect(addr).expect("Failed to connect");
 //! # node.send(peer_id, &()).expect("Failed to send");
@@ -103,8 +100,7 @@
 //! # let callback = SimpleCallback::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
 //! # let _dummy: u64 = node.node_id();
-//! # node.open("0.0.0.0:0").expect("Failed to bind");
-//! # node.open("[::1]:0").expect("Failed to bind");
+//! # node.listen_defaults().expect("Failed to bind");
 //! # let peer_id = node.node_id();
 //! # let msg = ();
 //! node.send(peer_id, &msg).expect("Failed to send");
@@ -118,8 +114,7 @@
 //! # let callback = SimpleCallback::with_random_id();
 //! # let node = Node::new(Box::new(callback.clone()));
 //! # let _dummy: u64 = node.node_id();
-//! # node.open("0.0.0.0:0").expect("Failed to bind");
-//! # node.open("[::1]:0").expect("Failed to bind");
+//! # node.listen_defaults().expect("Failed to bind");
 //! # let peer_id = node.node_id();
 //! # let msg = ();
 //! # node.send(peer_id, &msg).expect("Failed to send");
