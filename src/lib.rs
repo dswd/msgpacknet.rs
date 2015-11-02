@@ -23,9 +23,10 @@
 //!
 //! # Low-level protocol
 //! When establishing a new connection (either incoming or outgoing), first an `InitMessage` is
-//! sent to the remote node and then the initialization message is read from that node.
-//! After identifying the remote node the connection is either rejected and closed or accepted and
-//! added to the connection registry.
+//! sent to the remote node together with the local `NodeId` and then the initialization message
+//! and the remote `NodeId` is read from that node.
+//! After inspecting the initialization message, the connection is either rejected and closed or
+//! accepted and added to the connection registry.
 //!
 //! When established, the connection can be used to send multiple messages of the `Message` type.
 //!
@@ -38,7 +39,7 @@
 //!
 //! ```
 //! use msgpacknet::*;
-//! let node = Node::<String, (u64, u64)>::with_random_id();
+//! let node = Node::<String, (u64, u64)>::create_default();
 //! ```
 //!
 //! Then, sockets can be opened for listening and accepting connections.
@@ -47,7 +48,7 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let node = Node::<String, (u64, u64)>::with_random_id();
+//! # let node = Node::<String, (u64, u64)>::create_default();
 //! node.listen_defaults().expect("Failed to bind");
 //! ```
 //!
@@ -56,32 +57,29 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let node = Node::<String, (u64, u64)>::with_random_id();
+//! # let node = Node::<String, (u64, u64)>::create_default();
 //! # node.listen_defaults().expect("Failed to bind");
 //! println!("Addresses: {:?}", node.addresses());
 //! let addr = node.addresses()[0];
 //! ```
 //!
 //! Connections to other nodes can be established via
-//! [`connect(...)`](struct.Node.html#method.connect). The result of the call is a
-//! [`ConnectionRequest`](struct.ConnectionRequest.html) which can be used to accept the
-//! connection and identify the remote side's node id.
+//! [`connect(...)`](struct.Node.html#method.connect). The result of the call is the remote side's
+//! node id.
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let node = Node::<String, (u64, u64)>::with_random_id();
+//! # let node = Node::<String, (u64, u64)>::create_default();
 //! # node.listen_defaults().expect("Failed to bind");
 //! # let addr = node.addresses()[0];
-//! let request = node.connect(addr).expect("Failed to connect");
-//! let peer_id = request.init_message().clone();
-//! request.accept(peer_id.clone());
+//! let peer_id = node.connect(addr).expect("Failed to connect");
 //! ```
 //!
 //! Then, messages can be sent via [`node.send(...)`](struct.Node.html#method.send)...
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let node = Node::<String, (u64, u64)>::with_random_id();
+//! # let node = Node::<String, (u64, u64)>::create_default();
 //! # let peer_id = node.node_id();
 //! let msg = "Hello world".to_owned();
 //! node.send(&peer_id, &msg).expect("Failed to send");
@@ -91,9 +89,9 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let node = Node::<(), (u64, u64)>::with_random_id();
+//! # let node = Node::<(), (u64, u64)>::create_default();
 //! # node.send(&node.node_id(), &()).expect("Failed to send");
-//! let reply = node.receive();
+//! let event = node.receive();
 //! ```
 
 //#![cfg_attr(test, feature(test))]

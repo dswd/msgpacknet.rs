@@ -34,14 +34,12 @@ fn node_connect() {
     let client = Node::<u64, u64, u64>::new(1, 1);
     assert!(client.listen("localhost:0").is_ok());
     assert!(!client.is_connected(&0));
-    let req = client.connect(server.addresses()[0]);
-    assert!(req.is_ok());
-    req.unwrap().accept(0);
+    assert!(client.connect(server.addresses()[0]).is_ok());
     assert!(client.is_connected(&0));
     let evt = server.receive_timeout(Duration::from_secs(1));
     assert!(evt.is_some());
     if let Event::ConnectionRequest(req) = evt.unwrap() {
-        req.accept(1);
+        req.accept();
     } else {
         assert!(false);
     }
@@ -55,9 +53,9 @@ fn node_send_remote(b: &mut Bencher) {
     assert!(server.listen("localhost:0").is_ok());
     let client = Node::new(1, 1);
     assert!(client.listen("localhost:0").is_ok());
-    client.connect(server.addresses()[0]).unwrap().accept(0);
+    assert!(client.connect(server.addresses()[0]).is_ok());
     if let Event::ConnectionRequest(req) = server.receive_timeout(Duration::from_secs(1)).unwrap() {
-        req.accept(1);
+        req.accept();
     } else {
         assert!(false);
     }

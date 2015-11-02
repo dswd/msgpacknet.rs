@@ -175,6 +175,16 @@ pub struct NodeInner<M: Message, N: NodeId, I: InitMessage> {
 ///   distinguish nodes.
 /// * `I` a type implementing the [`InitMessage`](trait.InitMessage.html) trait that is used for
 ///   the first initialization message exchanged on any connection.
+///
+/// There are several different constructors:
+///
+/// * [`new(...)`](#method.new) creates a new node with a given node id and initialization message.
+/// * [`without_init(...)`](#method.without_init) creates a new node with a given node id but
+///   without initialization message.
+/// * [`with_random_id(...)`](#method.with_random_id) creates a new node with a random node id and
+///   given initialization message.
+/// * [`create_default()`](#method.create_default) creates a new node with a random node id and
+///   without initialization message.
 #[derive(Clone)]
 pub struct Node<M: Message, N: NodeId, I: InitMessage>(Arc<NodeInner<M, N, I>>);
 
@@ -189,7 +199,8 @@ impl<M: Message, N: NodeId, I: InitMessage> Deref for Node<M, N, I> {
 impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// Create a new node
     ///
-    /// The only parameter `callback` will be used to communicate with the caller.
+    /// The parameter `node_id` must be a unique identifier for this node and `init_message` is
+    /// the first message sent automatically to other nodes when connected.
     /// The result of this call is a guard that closes the node if dropped.
     pub fn new(node_id: N, init_message: I) -> CloseGuard<M, N, I> {
         CloseGuard(Node(Arc::new(NodeInner{
@@ -210,11 +221,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// The default value is 60 seconds.
     ///
     /// Note: Changes to this value only affect connections created after the change.
+    #[inline]
     pub fn set_connection_timeout(&self, dur: Duration) {
         *self.connection_timeout.lock().expect("Lock poisoned") = dur;
     }
 
     /// The connection timeout
+    #[inline]
     pub fn connection_timeout(&self) -> Duration {
         *self.connection_timeout.lock().expect("Lock poisoned")
     }
@@ -226,11 +239,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// smoother behavior. The default value is 60 seconds.
     ///
     /// Note: Changes to this value only affect connections created after the change.
+    #[inline]
     pub fn set_stats_halflife_time(&self, dur: Duration) {
         *self.stats_halflife_time.lock().expect("Lock poisoned") = dur;
     }
 
     /// The statistics half-life time
+    #[inline]
     pub fn stats_halflife_time(&self) -> Duration {
         *self.stats_halflife_time.lock().expect("Lock poisoned")
     }
@@ -238,11 +253,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// Set the initialization message
     ///
     /// This message is sent as a first message on all new connections and must identify the node.
+    #[inline]
     pub fn set_init_message(&self, init: I) {
         *self.init_message.lock().expect("Lock poisoned") = init;
     }
 
     /// The initialization message
+    #[inline]
     pub fn init_message(&self) -> I {
         self.init_message.lock().expect("Lock poisoned").clone()
     }
@@ -275,6 +292,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// Note: This method will always open two new sockets, regardless of whether sockets are
     /// already open.
+    #[inline]
     pub fn listen_defaults(&self) -> Result<(), Error<N>> {
         try!(self.listen("0.0.0.0:0"));
         try!(self.listen("[::0]:0"));
@@ -296,6 +314,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// will be returned. Otherwise, the call will block until an event is received.
     ///
     /// If the node has been closed, `Event::Closed` will be returned immediately.
+    #[inline]
     pub fn receive(&self) -> Event<M, N, I> {
         match self.events.get() {
             Some(evt) => evt,
@@ -310,6 +329,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// timeout is reached (then `None` is returned).
     ///
     /// If the node has been closed, `Event::Closed` will be returned immediately.
+    #[inline]
     pub fn receive_timeout(&self, timeout: Duration) -> Option<Event<M, N, I>> {
         match self.events.get_timeout(timeout) {
             Some(Some(evt)) => Some(evt),
@@ -319,6 +339,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     }
 
     /// The id of this node
+    #[inline]
     pub fn node_id(&self) -> N {
         self.node_id.clone()
     }
@@ -343,6 +364,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     }
 
     /// Whether this node is connected to the given node
+    #[inline]
     pub fn is_connected(&self, id: &N) -> bool {
         self.connections.read().expect("Lock poisoned").contains_key(id)
     }
@@ -386,13 +408,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         }
     }
 
-    /// Open a connection
+    /// Open a connection and return the request
     ///
-    /// This method opens a connection to the given address, exchanges initialization messages with
-    /// it and adds the connection to the registry to be used for sending messages and spawns a
-    /// thread to handle incoming messages.
-    /// This method will only return after the connection has been fully established.
-    /// The result of the method on success is the node id of the new remote node.
+    /// This method opens a connection, exchanges initialization messages with the peer and returns
+    /// a connection request. This request object can then be used to inspect the node id and the
+    /// initialization message and then decide whether to `accept()` or `reject()` the connection.
+    /// This method blocks until the underlying connection has been established and the
+    /// initialization messages have been exchanged.
     ///
     /// Note: This connection will automatically be closed when it becomes idle for longer than the
     /// [specified timeout](trait.Callback.html#method.connection_timeout).
@@ -400,12 +422,33 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// Note 2: It is possible to connect the node to itself. However, messages will just be
     /// short-circuited and the connection will not be used and closed after the timeout.
     #[inline]
-    pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
+    pub fn connect_request<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
         let sock = try!(TcpStream::connect(addr).map_err(|err| Error::ConnectionError(err)));
         Ok(try!(ConnectionRequest::new(self.clone(), sock)))
+    }
+
+
+    /// Open a connection and accept it automatically
+    ///
+    /// This method opens a connection, exchanges initialization messages with the peer,
+    /// automatically accepts the peer and returns its node_id.
+    /// This method blocks until the underlying connection has been established and the
+    /// initialization messages have been exchanged.
+    ///
+    /// Note: This connection will automatically be closed when it becomes idle for longer than the
+    /// [specified timeout](trait.Callback.html#method.connection_timeout).
+    ///
+    /// Note 2: It is possible to connect the node to itself. However, messages will just be
+    /// short-circuited and the connection will not be used and closed after the timeout.
+    #[inline]
+    pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<N, Error<N>> {
+        let req = try!(self.connect_request(addr));
+        let id = req.node_id().clone();
+        req.accept();
+        Ok(id)
     }
 
     fn shutdown_socket(&self, socket: &TcpListener) -> Result<(), Error<N>> {
@@ -437,22 +480,27 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     }
 }
 
-impl<M: Message, N: NodeId + InitMessage> Node<M, N, N> where N: Rand {
+impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> where N: Rand {
     /// Create a new node with a random id
-    pub fn with_random_id() -> CloseGuard<M, N, N> {
-        let id = rand::random::<N>();
-        Node::new(id.clone(), id)
+    #[inline]
+    pub fn with_random_id(init: I) -> CloseGuard<M, N, I> {
+        Node::new(rand::random::<N>(), init)
     }
 }
 
-impl<M: Message, N: NodeId, I: InitMessage> Iterator for Node<M, N, I> {
-    type Item = Event<M, N, I>;
+impl<M: Message, N: NodeId> Node<M, N, ()> {
+    /// Create a new node with a random id
+    #[inline]
+    pub fn without_init(node_id: N) -> CloseGuard<M, N, ()> {
+        Node::new(node_id, ())
+    }
+}
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.receive() {
-            Event::Closed => None,
-            evt @ _ => Some(evt)
-        }
+impl<M: Message, N: NodeId> Node<M, N, ()> where N: Rand {
+    /// Create a new node with a random id and without init message
+    #[inline]
+    pub fn create_default() -> CloseGuard<M, N, ()> {
+        Node::new(rand::random::<N>(), ())
     }
 }
 
@@ -493,19 +541,21 @@ pub struct ConnectionStats {
 pub struct ConnectionRequest<M: Message, N: NodeId, I: InitMessage> {
     node: Node<M, N, I>,
     socket: TcpStream,
-    init: I
+    init: I,
+    node_id: N,
 }
 
 impl<M: Message, N: NodeId, I: InitMessage> PartialEq for ConnectionRequest<M, N, I> {
     fn eq(&self, other: &Self) -> bool {
-        self.socket.peer_addr().unwrap() == other.socket.peer_addr().unwrap()
+        self.node_id == other.node_id
+        && self.socket.peer_addr().unwrap() == other.socket.peer_addr().unwrap()
         && self.socket.local_addr().unwrap() == other.socket.local_addr().unwrap()
     }
 }
 
 impl<M: Message, N: NodeId, I: InitMessage> fmt::Debug for ConnectionRequest<M, N, I> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "ConnectionRequest(from: {:?}, init: {:?})", self.socket.peer_addr().unwrap(), self.init)
+        write!(fmt, "ConnectionRequest(from: {:?}, node_id: {:?}, init: {:?})", self.socket.peer_addr().unwrap(), self.node_id, self.init)
     }
 }
 
@@ -515,13 +565,13 @@ impl<M: Message, N: NodeId, I: InitMessage> ConnectionRequest<M, N, I> {
         try!(socket.set_read_timeout(Some(node.connection_timeout())).map_err(|err| Error::ConnectionError(err)));
         {
             let mut writer = rmp_serde::Serializer::new(&mut socket);
-            try!(node.init_message().serialize(&mut writer).map_err(|_| Error::SendError));
+            try!((node.init_message(), node.node_id()).serialize(&mut writer).map_err(|_| Error::SendError));
         }
-        let init = {
+        let (init, node_id) = {
             let mut reader = rmp_serde::Deserializer::new(&socket);
-            try!(I::deserialize(&mut reader).map_err(|_| Error::ReadError))
+            try!(Deserialize::deserialize(&mut reader).map_err(|_| Error::ReadError))
         };
-        Ok(ConnectionRequest{node: node, socket: socket, init: init})
+        Ok(ConnectionRequest{node: node, socket: socket, init: init, node_id: node_id})
     }
 
     /// The initialization message received from the remote side.
@@ -529,13 +579,17 @@ impl<M: Message, N: NodeId, I: InitMessage> ConnectionRequest<M, N, I> {
         &self.init
     }
 
+    /// The node id received from the remote side.
+    pub fn node_id(&self) -> &N {
+        &self.node_id
+    }
+
     /// Accept the connection
     ///
-    /// When this method is called, the connection is registered with the given node_id and is
-    /// usable for message exchange afterwards.
-    /// The id of the remote node should be extracted from the received initialization message.
-    pub fn accept(self, node_id: N) {
-        let con = Connection::new(self.node.clone(), self.socket, node_id);
+    /// When this method is called, the connection is registered and is usable for message exchange
+    /// afterwards.
+    pub fn accept(self) {
+        let con = Connection::new(self.node.clone(), self.socket, self.node_id);
         self.node.accept_connection(con);
     }
 
