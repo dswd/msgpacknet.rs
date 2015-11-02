@@ -48,7 +48,7 @@ pub enum Error<N> where N: NodeId {
     /// The node has already been closed
     AlreadyClosed,
 
-    /// Failed to open a server socket
+    /// Failed to open a node socket
     OpenError(io::Error),
 
     /// Failed to establish a connection
@@ -266,7 +266,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
 
     /// Listen on the specified address
     ///
-    /// This method will open a new server listening to the given address. A dedicated thread will
+    /// This method will open a new node listening to the given address. A dedicated thread will
     /// be started to handle incoming connections. The node can listen on multiple addresses.
     /// The result of this method, if successful, is the actual address used.
     ///
@@ -277,13 +277,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
-        let mut servers = self.sockets.lock().expect("Lock poisoned");
-        let server: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr).map_err(|err| Error::OpenError(err))));
+        let mut nodes = self.sockets.lock().expect("Lock poisoned");
+        let node: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr).map_err(|err| Error::OpenError(err))));
         let cloned_self = self.clone();
-        let cloned_server = server.clone();
-        let used_addr = server.local_addr().expect("Failed to get local address");
-        let join = thread::spawn(move || cloned_self.run_server(cloned_server));
-        servers.push((server, join));
+        let cloned_node = node.clone();
+        let used_addr = node.local_addr().expect("Failed to get local address");
+        let join = thread::spawn(move || cloned_self.run_node(cloned_node));
+        nodes.push((node, join));
         Ok(used_addr)
     }
 
@@ -384,7 +384,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         stats
     }
 
-    fn run_server(&self, socket: Arc<TcpListener>) -> Result<(), Error<N>> {
+    fn run_node(&self, socket: Arc<TcpListener>) -> Result<(), Error<N>> {
         loop {
             let (sock, _) = try!(socket.accept().map_err(|e| Error::ConnectionError(e)));
             let req = try!(ConnectionRequest::new(self.clone(), sock));
@@ -598,7 +598,7 @@ impl<M: Message, N: NodeId, I: InitMessage> ConnectionRequest<M, N, I> {
 
 
 pub struct ConnectionInner<M: Message, N: NodeId, I: InitMessage> {
-    server: Node<M, N, I>,
+    node: Node<M, N, I>,
     socket: Mutex<TcpStream>,
     writer: Mutex<StatWriter<TcpStream>>,
     writer_stats: Arc<RwLock<Stats>>,
@@ -620,14 +620,14 @@ impl<M: Message, N: NodeId, I: InitMessage> Deref for Connection<M, N, I> {
 }
 
 impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
-    fn new(server: Node<M, N, I>, socket: TcpStream, node_id: N) -> Self {
-        let writer = StatWriter::new(socket.try_clone().expect("Failed to clone socket"), server.stats_halflife_time());
+    fn new(node: Node<M, N, I>, socket: TcpStream, node_id: N) -> Self {
+        let writer = StatWriter::new(socket.try_clone().expect("Failed to clone socket"), node.stats_halflife_time());
         let writer_stats = writer.stats();
-        let input = StatReader::new(socket.try_clone().expect("Failed to clone socket"), server.stats_halflife_time());
+        let input = StatReader::new(socket.try_clone().expect("Failed to clone socket"), node.stats_halflife_time());
         let reader_stats = input.stats();
         let reader = rmp_serde::Deserializer::new(input);
         Connection(Arc::new(ConnectionInner{
-            server: server,
+            node: node,
             writer: Mutex::new(writer),
             writer_stats: writer_stats,
             reader: Mutex::new(reader),
@@ -663,7 +663,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
 
     fn run(&self) -> Result<(), Error<N>> {
         let res = self.run_inner();
-        self.server.del_connection(&self.node_id);
+        self.node.del_connection(&self.node_id);
         res
     }
 
@@ -671,7 +671,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
         let mut reader = self.reader.lock().expect("Lock poisoned");
         loop {
             let msg = try!(M::deserialize(&mut reader as &mut rmp_serde::Deserializer<StatReader<TcpStream>>).map_err(|_| Error::ReadError));
-            self.server.handle_message(self.node_id.clone(), msg);
+            self.node.handle_message(self.node_id.clone(), msg);
         }
     }
 
