@@ -36,7 +36,8 @@ impl<T> NodeId for T where T: Serialize + Deserialize + Send + Sync + Debug + Cl
 /// The trait used for initialization messages
 ///
 /// This is the type of message that will be exchanged during the initialization phase.
-/// It needs to contain the [`NodeId`](trait.NodeId.html) of the sending node to identify it.
+/// It could be used to differenciate between different protocols, versions and capabilities and
+/// to decide whether to accept a connection or not.
 /// This trait is implemented automatically for all types that fulfill the requirements.
 pub trait InitMessage: Serialize + Deserialize + Send + Sync + Clone + Debug + 'static {}
 impl<T> InitMessage for T where T: Serialize + Deserialize + Send + Sync + Clone + Debug + 'static {}
