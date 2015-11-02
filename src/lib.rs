@@ -93,15 +93,13 @@
 //! let event = node.receive();
 //! ```
 
-// This crate is tageted for Rust 1.4 stable
+// This crate is targeted for Rust 1.4 stable
 
-#![cfg_attr(test, feature(test))]
 extern crate serde;
 extern crate rmp_serde;
 extern crate net2;
 extern crate time;
 extern crate rand;
-#[cfg(test)] extern crate test;
 
 mod stats;
 mod queue;
