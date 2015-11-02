@@ -19,7 +19,7 @@
 //!
 //! * [`InitMessage`](trait.InitMessage.html) - The first message exchanged on all connections uses
 //! the `InitMessage` trait instead of `Message`. This first message must include the
-//! `NodeId` of the remote node to identify it.
+//! `NodeId` of the sender to identify it.
 //!
 //! # Low-level protocol
 //! When establishing a new connection (either incoming or outgoing), first an `InitMessage` is
@@ -33,21 +33,12 @@
 //! [`CloseGuard`](struct.CloseGuard.html), the connection is closed.
 //!
 //! # Examples
-//! To use this crate, first a callback conforming to the [`Callback`](trait.Callback.html) trait
-//! has to be created. The [`SimpleCallback`](struct.SimpleCallback.html) struct provides a simple
-//! implementation. The callback has to be created with a node id which should be unique.
+//! To use this crate, first a [`Node`](struct.Node.html) has to be created with a node id and an
+//! initialization message that contains this id and which is sent to other nodes as first message.
 //!
 //! ```
-//! # use msgpacknet::*;
-//! let callback = SimpleCallback::<String, (u64, u64)>::with_random_id();
-//! ```
-//!
-//! Afterwards, the node can be created with a boxed copy of the callback as parameter.
-//!
-//! ```
-//! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<(), u64>::with_random_id();
-//! let node = Node::new(Box::new(callback.clone()));
+//! use msgpacknet::*;
+//! let node = Node::<String, (u64, u64)>::with_random_id();
 //! ```
 //!
 //! Then, sockets can be opened for listening and accepting connections.
@@ -56,8 +47,7 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<(), u64>::with_random_id();
-//! # let node = Node::new(Box::new(callback.clone()));
+//! # let node = Node::<String, (u64, u64)>::with_random_id();
 //! node.listen_defaults().expect("Failed to bind");
 //! ```
 //!
@@ -66,45 +56,44 @@
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<(), u64>::with_random_id();
-//! # let node = Node::new(Box::new(callback.clone()));
+//! # let node = Node::<String, (u64, u64)>::with_random_id();
 //! # node.listen_defaults().expect("Failed to bind");
 //! println!("Addresses: {:?}", node.addresses());
 //! let addr = node.addresses()[0];
 //! ```
 //!
 //! Connections to other nodes can be established via
-//! [`connect(...)`](struct.Node.html#method.connect). The result of the call is the id of that
-//! peer.
+//! [`connect(...)`](struct.Node.html#method.connect). The result of the call is a
+//! [`ConnectionRequest`](struct.ConnectionRequest.html) which can be used to accept the
+//! connection and identify the remote side's node id.
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<(), u64>::with_random_id();
-//! # let node = Node::new(Box::new(callback.clone()));
+//! # let node = Node::<String, (u64, u64)>::with_random_id();
 //! # node.listen_defaults().expect("Failed to bind");
 //! # let addr = node.addresses()[0];
-//! let peer_id = node.connect(addr).expect("Failed to connect");
+//! let request = node.connect(addr).expect("Failed to connect");
+//! let peer_id = request.init_message().clone();
+//! request.accept(peer_id.clone());
 //! ```
 //!
 //! Then, messages can be sent via [`node.send(...)`](struct.Node.html#method.send)...
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<String, u64>::with_random_id();
-//! # let node = Node::new(Box::new(callback.clone()));
+//! # let node = Node::<String, (u64, u64)>::with_random_id();
 //! # let peer_id = node.node_id();
 //! let msg = "Hello world".to_owned();
-//! node.send(peer_id, &msg).expect("Failed to send");
+//! node.send(&peer_id, &msg).expect("Failed to send");
 //! ```
 //!
 //! ...and received via [`callback.receive()`](struct.SimpleCallback.html#method.receive).
 //!
 //! ```
 //! # use msgpacknet::*;
-//! # let callback = SimpleCallback::<(), u64>::with_random_id();
-//! # let node = Node::new(Box::new(callback.clone()));
-//! # node.send(node.node_id(), &()).expect("Failed to send");
-//! let reply = callback.receive();
+//! # let node = Node::<(), (u64, u64)>::with_random_id();
+//! # node.send(&node.node_id(), &()).expect("Failed to send");
+//! let reply = node.receive();
 //! ```
 
 //#![cfg_attr(test, feature(test))]
@@ -117,9 +106,8 @@ extern crate rand;
 #[cfg(test)] extern crate test;
 
 mod stats;
+mod queue;
 mod socket;
-mod simple;
 #[cfg(test)] mod tests;
 
-pub use simple::{SimpleCallback, SimpleCallbackEvent};
-pub use socket::{CloseGuard, NodeStats, ConnectionStats, Node, Message, InitMessage, Callback, NodeId, Error};
+pub use socket::{Event, ConnectionRequest, CloseGuard, NodeStats, ConnectionStats, Node, Message, InitMessage, NodeId, Error};

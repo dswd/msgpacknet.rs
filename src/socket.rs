@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use net2::TcpStreamExt;
 use rmp_serde;
+use rand::{self, Rand};
 
 use std::net::{TcpListener, TcpStream, ToSocketAddrs, Shutdown, SocketAddr};
 use std::sync::{RwLock, Arc, Mutex};
@@ -8,12 +9,13 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::mem;
+use std::{mem, fmt};
 use std::time::Duration;
 use std::thread::{self, JoinHandle};
 use std::io::{self, BufWriter};
 
 use super::stats::{Stats, StatReader, StatWriter};
+use super::queue::Queue;
 
 
 /// The trait used for messages
@@ -36,8 +38,8 @@ impl<T> NodeId for T where T: Serialize + Deserialize + Send + Sync + Debug + Cl
 /// This is the type of message that will be exchanged during the initialization phase.
 /// It needs to contain the [`NodeId`](trait.NodeId.html) of the sending node to identify it.
 /// This trait is implemented automatically for all types that fulfill the requirements.
-pub trait InitMessage: Serialize + Deserialize + Send + Sync + Clone + 'static {}
-impl<T> InitMessage for T where T: Serialize + Deserialize + Send + Sync + Clone + 'static {}
+pub trait InitMessage: Serialize + Deserialize + Send + Sync + Clone + Debug + 'static {}
+impl<T> InitMessage for T where T: Serialize + Deserialize + Send + Sync + Clone + Debug + 'static {}
 
 
 /// The error type used througout the crate
@@ -69,94 +71,56 @@ pub enum Error<N> where N: NodeId {
 }
 
 
-/// The trait used as callback
-pub trait Callback<M: Message, N: NodeId, I: InitMessage>: Send + Sync {
-    /// The identifier of the current node
-    fn node_id(&self, node: &Node<M, N, I>) -> N;
-
-    /// Create an initialization message to be sent to a new connection
+/// The enum used for events
+#[derive(PartialEq, Debug)]
+pub enum Event<M: Message, N: NodeId, I: InitMessage> {
+    /// A received message
     ///
-    /// This method is called whenever a new connection is going to be established and an
-    /// initialization message needs to be sent.
-    fn create_init_msg(&self, node: &Node<M, N, I>) -> I;
+    /// This event is emitted whenever a new message is received from any connection.
+    Message(N, M),
 
-    /// Handle an initialization message received from a new connection
+    /// An incoming connection request
     ///
-    /// This method is called whenever a new connection is established (either incoming or
-    /// outgoing) and the initialization message has been received.
-    /// The result of this method must either be the identifier of the remote node if the
-    /// connection is accepted or `None` if the connection is rejected.
+    /// This event is emitted whenever a new incoming connection is established and the
+    /// initialization message has been received.
+    /// To accept the connection [`accept(...)`](struct.ConnectionRequest.html#method.accept)
+    /// has to be called.
     ///
     /// Note: The connection has not been registered in the node and can't be used to send any
     /// messages yet.
-    fn handle_init_msg(&self, node: &Node<M, N, I>, init: &I) -> Option<N>;
+    ConnectionRequest(ConnectionRequest<M, N, I>),
 
-    /// Handle an incoming message
+    /// A new estasblished connection
     ///
-    /// This method is called whenever a new message is received from any connection.
-    fn handle_message(&self, node: &Node<M, N, I>, src: &N, msg: M);
+    /// This event is emitted whenever a new connection has been established and can be used to
+    /// send messages.
+    Connected(N),
 
-    /// Handle a new connection
+    /// A lost connection
     ///
-    /// This method is called whenever a new connection has been established and can be used to
-    /// send messages. The default is to ignore the event and there is no implementation required.
-    #[allow(unused_variables)]
-    fn on_connected(&self, node: &Node<M, N, I>, id: &N) {
-
-    }
-
-    /// Handle a lost connection
+    /// This event is emitted whenever a connection has been lost and can no longer be used to
+    /// send messages.
     ///
-    /// This method is called whenever a connection has been lost and can no longer be used to
-    /// send messages. The default is to ignore the event and there is no implementation required.
-    ///
-    /// Note: This method is called after the connection has been closed and unregistered,
+    /// Note: This event is emitted after the connection has been closed and unregistered,
     /// so it can't be used to send final messages on that connection.
     ///
-    /// Note 2: This method will not be called if a duplicate connection to the same node is
+    /// Note 2: This event will not be emitted if a duplicate connection to the same node is
     /// closed.
-    #[allow(unused_variables)]
-    fn on_disconnected(&self, node: &Node<M, N, I>, id: &N) {
+    Disconnected(N),
 
-    }
-
-    /// Handle node closing start
+    /// Node closing
     ///
-    /// This method is called whenever the node is shutting down. At this time, all connections
+    /// This event is emitted whenever the node is shutting down. At this time, all connections
     /// are still active and can be used to send final messages.
-    #[allow(unused_variables)]
-    fn on_closing(&self, node: &Node<M, N, I>) {
+    Closing,
 
-    }
-
-    /// Handle node closing end
+    /// Node closed
     ///
-    /// This method is called whenever the node has shut down. At this time, all connections
+    /// This event is emitted whenever the node has shut down. At this time, all connections
     /// have been closed and no final messages can be sent.
-    #[allow(unused_variables)]
-    fn on_closed(&self, node: &Node<M, N, I>) {
-
-    }
-
-    /// The connection timeout
-    ///
-    /// This method id called to determine the timeout used for connections. Whenever a connection
-    /// is idle longer than this timeout, it will be closed. The default value is 60 seconds.
-    #[allow(unused_variables)]
-    fn connection_timeout(&self, node: &Node<M, N, I>) -> Duration {
-        Duration::from_secs(60)
-    }
-
-    /// The statistics half-life time
-    ///
-    /// This value is used as a parameter for the rolling average statistics of sending and
-    /// receiving rates. Shorter durations react faster to changes and longer durations result in
-    /// smoother behavior. The default value is 60 seconds.
-    #[allow(unused_variables)]
-    fn stats_halflife_time(&self, node: &Node<M, N, I>) -> Duration {
-        Duration::from_secs(60)
-    }
+    Closed
 }
+
 
 /// A guard that closes the node when dropped.
 ///
@@ -189,10 +153,14 @@ pub struct NodeStats<N: NodeId> {
 
 /// The inner struct that holds all node data
 pub struct NodeInner<M: Message, N: NodeId, I: InitMessage> {
-    callback: Box<Callback<M, N, I>>,
+    node_id: N,
+    events: Queue<Event<M, N, I>>,
     sockets: Mutex<Vec<(Arc<TcpListener>, JoinHandle<Result<(), Error<N>>>)>>,
     connections: RwLock<HashMap<N, Connection<M, N, I>>>,
     closed: RwLock<bool>,
+    connection_timeout: Mutex<Duration>,
+    stats_halflife_time: Mutex<Duration>,
+    init_message: Mutex<I>,
 }
 
 
@@ -223,13 +191,60 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// The only parameter `callback` will be used to communicate with the caller.
     /// The result of this call is a guard that closes the node if dropped.
-    pub fn new(callback: Box<Callback<M, N, I>>) -> CloseGuard<M, N, I> {
+    pub fn new(node_id: N, init_message: I) -> CloseGuard<M, N, I> {
         CloseGuard(Node(Arc::new(NodeInner{
-            callback: callback,
+            node_id: node_id,
+            events: Queue::new(),
             sockets: Mutex::new(Vec::new()),
             connections: RwLock::new(HashMap::new()),
-            closed: RwLock::new(false)
+            closed: RwLock::new(false),
+            connection_timeout: Mutex::new(Duration::from_secs(60)),
+            stats_halflife_time: Mutex::new(Duration::from_secs(60)),
+            init_message: Mutex::new(init_message),
         })))
+    }
+
+    /// Set the connection timeout
+    ///
+    /// Whenever a connection is idle longer than this timeout, it will be closed.
+    /// The default value is 60 seconds.
+    ///
+    /// Note: Changes to this value only affect connections created after the change.
+    pub fn set_connection_timeout(&self, dur: Duration) {
+        *self.connection_timeout.lock().expect("Lock poisoned") = dur;
+    }
+
+    /// The connection timeout
+    pub fn connection_timeout(&self) -> Duration {
+        *self.connection_timeout.lock().expect("Lock poisoned")
+    }
+
+    /// Set the statistics half-life time
+    ///
+    /// This value is used as a parameter for the rolling average statistics of sending and
+    /// receiving rates. Shorter durations react faster to changes and longer durations result in
+    /// smoother behavior. The default value is 60 seconds.
+    ///
+    /// Note: Changes to this value only affect connections created after the change.
+    pub fn set_stats_halflife_time(&self, dur: Duration) {
+        *self.stats_halflife_time.lock().expect("Lock poisoned") = dur;
+    }
+
+    /// The statistics half-life time
+    pub fn stats_halflife_time(&self) -> Duration {
+        *self.stats_halflife_time.lock().expect("Lock poisoned")
+    }
+
+    /// Set the initialization message
+    ///
+    /// This message is sent as a first message on all new connections and must identify the node.
+    pub fn set_init_message(&self, init: I) {
+        *self.init_message.lock().expect("Lock poisoned") = init;
+    }
+
+    /// The initialization message
+    pub fn init_message(&self) -> I {
+        self.init_message.lock().expect("Lock poisoned").clone()
     }
 
     /// Listen on the specified address
@@ -275,42 +290,39 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         addrs
     }
 
-    /// The id of this node as obtained from the callback
+    pub fn receive(&self) -> Event<M, N, I> {
+        match self.events.get() {
+            Some(evt) => evt,
+            None => Event::Closed
+        }
+    }
+
+    pub fn receive_timeout(&self, timeout: Duration) -> Option<Event<M, N, I>> {
+        match self.events.get_timeout(timeout) {
+            Some(Some(evt)) => Some(evt),
+            Some(None) => Some(Event::Closed),
+            None => None
+        }
+    }
+
+    /// The id of this node
     pub fn node_id(&self) -> N {
-        self.callback.node_id(&self)
+        self.node_id.clone()
     }
 
-    fn create_init_msg(&self) -> I {
-        self.callback.create_init_msg(&self)
-    }
-
-    fn handle_init_msg(&self, init: &I) -> Option<N> {
-        self.callback.handle_init_msg(&self, &init)
-    }
-
-    /// The connection timeout as obtained from the callback
-    pub fn connection_timeout(&self) -> Duration {
-        self.callback.connection_timeout(&self)
-    }
-
-    /// The statistics half-life time as obtained from the callback
-    pub fn stats_halflife_time(&self) -> Duration {
-        self.callback.stats_halflife_time(&self)
-    }
-
-    fn handle_message(&self, src: &N, msg: M) {
-        self.callback.handle_message(&self, &src, msg)
+    fn handle_message(&self, src: N, msg: M) {
+        self.events.put(Event::Message(src, msg));
     }
 
     fn add_connection(&self, con: Connection<M, N, I>) {
         let id = con.node_id().clone();
         self.connections.write().expect("Lock poisoned").insert(id.clone(), con);
-        self.callback.on_connected(&self, &id);
+        self.events.put(Event::Connected(id));
     }
 
     fn del_connection(&self, id: &N) {
         self.connections.write().expect("Lock poisoned").remove(id);
-        self.callback.on_connected(&self, id);
+        self.events.put(Event::Disconnected(id.clone()));
     }
 
     fn get_connection(&self, id: &N) -> Option<Connection<M, N, I>> {
@@ -338,9 +350,8 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     fn run_server(&self, socket: Arc<TcpListener>) -> Result<(), Error<N>> {
         loop {
             let (sock, _) = try!(socket.accept().map_err(|e| Error::ConnectionError(e)));
-            let con = try!(Connection::new(self.clone(), sock));
-            self.add_connection(con.clone());
-            thread::spawn(move || con.run());
+            let req = try!(ConnectionRequest::new(self.clone(), sock));
+            self.events.put(Event::ConnectionRequest(req));
         }
     }
 
@@ -351,14 +362,14 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// It is possible to send messages to the node itself by using its address.
     /// If no connection to the destination exists, an error is returned.
     #[inline]
-    pub fn send(&self, dst: N, msg: &M) -> Result<(), Error<N>> {
-        if dst == self.node_id() {
-            self.handle_message(&dst, msg.clone());
+    pub fn send(&self, dst: &N, msg: &M) -> Result<(), Error<N>> {
+        if dst == &self.node_id {
+            self.handle_message(dst.clone(), msg.clone());
             return Ok(());
         }
-        match self.get_connection(&dst) {
+        match self.get_connection(dst) {
             Some(con) => con.send(msg),
-            None => Err(Error::NotConnected(dst))
+            None => Err(Error::NotConnected(dst.clone()))
         }
     }
 
@@ -376,16 +387,12 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// Note 2: It is possible to connect the node to itself. However, messages will just be
     /// short-circuited and the connection will not be used and closed after the timeout.
     #[inline]
-    pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<N, Error<N>> {
+    pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
         let sock = try!(TcpStream::connect(addr).map_err(|err| Error::ConnectionError(err)));
-        let con = try!(Connection::new(self.clone(), sock));
-        let id = con.node_id().clone();
-        self.add_connection(con.clone());
-        thread::spawn(move || con.run());
-        Ok(id)
+        Ok(try!(ConnectionRequest::new(self.clone(), sock)))
     }
 
     fn shutdown_socket(&self, socket: &TcpListener) -> Result<(), Error<N>> {
@@ -394,9 +401,14 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         socket.shutdown(Shutdown::Both).map_err(|e| Error::CloseError(e))
     }
 
+    fn accept_connection(&self, con: Connection<M, N, I>) {
+        self.add_connection(con.clone());
+        thread::spawn(move || con.run());
+    }
+
     #[inline]
     fn close(&self) -> Result<(), Error<N>> {
-        self.callback.on_closing(&self);
+        self.events.put(Event::Closing);
         *self.closed.write().expect("Lock poisoned") = true;
         let mut sockets = self.sockets.lock().expect("Lock poisoned");
         while let Some((s, j)) = sockets.pop() {
@@ -406,8 +418,16 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         for c in self.get_connections() {
             let _ = c.close();
         }
-        self.callback.on_closed(&self);
+        self.events.put(Event::Closed);
+        self.events.close();
         Ok(())
+    }
+}
+
+impl<M: Message, N: NodeId + InitMessage> Node<M, N, N> where N: Rand {
+    pub fn with_random_id() -> CloseGuard<M, N, N> {
+        let id = rand::random::<N>();
+        Node::new(id.clone(), id)
     }
 }
 
@@ -434,6 +454,63 @@ pub struct ConnectionStats {
 }
 
 
+pub struct ConnectionRequest<M: Message, N: NodeId, I: InitMessage> {
+    node: Node<M, N, I>,
+    socket: TcpStream,
+    init: I
+}
+
+impl<M: Message, N: NodeId, I: InitMessage> PartialEq for ConnectionRequest<M, N, I> {
+    fn eq(&self, other: &Self) -> bool {
+        self.socket.peer_addr().unwrap() == other.socket.peer_addr().unwrap()
+        && self.socket.local_addr().unwrap() == other.socket.local_addr().unwrap()
+    }
+}
+
+impl<M: Message, N: NodeId, I: InitMessage> fmt::Debug for ConnectionRequest<M, N, I> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "ConnectionRequest(from: {:?}, init: {:?})", self.socket.peer_addr().unwrap(), self.init)
+    }
+}
+
+
+impl<M: Message, N: NodeId, I: InitMessage> ConnectionRequest<M, N, I> {
+    fn new(node: Node<M, N, I>, mut socket: TcpStream) -> Result<Self, Error<N>> {
+        try!(socket.set_nodelay(true).map_err(|err| Error::ConnectionError(err)));
+        try!(socket.set_read_timeout(Some(node.connection_timeout())).map_err(|err| Error::ConnectionError(err)));
+        {
+            let mut writer = rmp_serde::Serializer::new(&mut socket);
+            try!(node.init_message().serialize(&mut writer).map_err(|_| Error::SendError));
+        }
+        let init = {
+            let mut reader = rmp_serde::Deserializer::new(&socket);
+            try!(I::deserialize(&mut reader).map_err(|_| Error::ReadError))
+        };
+        Ok(ConnectionRequest{node: node, socket: socket, init: init})
+    }
+
+    /// The initialization message received from the remote side.
+    pub fn init_message(&self) -> &I {
+        &self.init
+    }
+
+    /// Accept the connection
+    ///
+    /// When this method is called, the connection is registered with the given node_id and is
+    /// usable for message exchange afterwards.
+    /// The id of the remote node should be extracted from the received initialization message.
+    pub fn accept(self, node_id: N) {
+        let con = Connection::new(self.node.clone(), self.socket, node_id);
+        self.node.accept_connection(con);
+    }
+
+    /// Reject the connection
+    pub fn reject(self) {
+        drop(self.socket);
+    }
+}
+
+
 pub struct ConnectionInner<M: Message, N: NodeId, I: InitMessage> {
     server: Node<M, N, I>,
     socket: Mutex<TcpStream>,
@@ -443,6 +520,7 @@ pub struct ConnectionInner<M: Message, N: NodeId, I: InitMessage> {
     reader_stats: Arc<RwLock<Stats>>,
     node_id: N
 }
+
 
 #[derive(Clone)]
 pub struct Connection<M: Message, N: NodeId, I: InitMessage>(Arc<ConnectionInner<M, N, I>>);
@@ -456,28 +534,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Deref for Connection<M, N, I> {
 }
 
 impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
-    fn new(server: Node<M, N, I>, mut socket: TcpStream) -> Result<Self, Error<N>> {
-        try!(socket.set_nodelay(true).map_err(|err| Error::ConnectionError(err)));
-        try!(socket.set_read_timeout(Some(server.connection_timeout())).map_err(|err| Error::ConnectionError(err)));
-        {
-            let mut writer = rmp_serde::Serializer::new(&mut socket);
-            let init = server.create_init_msg();
-            try!(init.serialize(&mut writer).map_err(|_| Error::SendError));
-        }
-        let init = {
-            let mut reader = rmp_serde::Deserializer::new(&socket);
-            try!(I::deserialize(&mut reader).map_err(|_| Error::ReadError))
-        };
-        let node_id = match server.handle_init_msg(&init) {
-            Some(node_id) => node_id,
-            None => return Err(Error::ConnectionAborted)
-        };
+    fn new(server: Node<M, N, I>, socket: TcpStream, node_id: N) -> Self {
         let writer = StatWriter::new(socket.try_clone().expect("Failed to clone socket"), server.stats_halflife_time());
         let writer_stats = writer.stats();
         let input = StatReader::new(socket.try_clone().expect("Failed to clone socket"), server.stats_halflife_time());
         let reader_stats = input.stats();
         let reader = rmp_serde::Deserializer::new(input);
-        Ok(Connection(Arc::new(ConnectionInner{
+        Connection(Arc::new(ConnectionInner{
             server: server,
             writer: Mutex::new(writer),
             writer_stats: writer_stats,
@@ -485,7 +548,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
             reader_stats: reader_stats,
             socket: Mutex::new(socket),
             node_id: node_id
-        })))
+        }))
     }
 
     fn node_id(&self) -> &N {
@@ -522,7 +585,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
         let mut reader = self.reader.lock().expect("Lock poisoned");
         loop {
             let msg = try!(M::deserialize(&mut reader as &mut rmp_serde::Deserializer<StatReader<TcpStream>>).map_err(|_| Error::ReadError));
-            self.server.handle_message(&self.node_id, msg);
+            self.server.handle_message(self.node_id.clone(), msg);
         }
     }
 
