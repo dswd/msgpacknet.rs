@@ -221,13 +221,11 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// The default value is 60 seconds.
     ///
     /// Note: Changes to this value only affect connections created after the change.
-    #[inline]
     pub fn set_connection_timeout(&self, dur: Duration) {
         *self.connection_timeout.lock().expect("Lock poisoned") = dur;
     }
 
     /// The connection timeout
-    #[inline]
     pub fn connection_timeout(&self) -> Duration {
         *self.connection_timeout.lock().expect("Lock poisoned")
     }
@@ -239,13 +237,11 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// smoother behavior. The default value is 60 seconds.
     ///
     /// Note: Changes to this value only affect connections created after the change.
-    #[inline]
     pub fn set_stats_halflife_time(&self, dur: Duration) {
         *self.stats_halflife_time.lock().expect("Lock poisoned") = dur;
     }
 
     /// The statistics half-life time
-    #[inline]
     pub fn stats_halflife_time(&self) -> Duration {
         *self.stats_halflife_time.lock().expect("Lock poisoned")
     }
@@ -253,13 +249,11 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// Set the initialization message
     ///
     /// This message is sent as a first message on all new connections and must identify the node.
-    #[inline]
     pub fn set_init_message(&self, init: I) {
         *self.init_message.lock().expect("Lock poisoned") = init;
     }
 
     /// The initialization message
-    #[inline]
     pub fn init_message(&self) -> I {
         self.init_message.lock().expect("Lock poisoned").clone()
     }
@@ -294,7 +288,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// Note: This method will always open two new sockets, regardless of whether sockets are
     ///       already open.
-    #[inline]
     pub fn listen_defaults(&self) -> Result<(), Error<N>> {
         try!(self.listen("0.0.0.0:0"));
         try!(self.listen("[::0]:0"));
@@ -316,7 +309,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// will be returned. Otherwise, the call will block until an event is received.
     ///
     /// If the node has been closed, `Event::Closed` will be returned immediately.
-    #[inline]
     pub fn receive(&self) -> Event<M, N, I> {
         match self.events.get() {
             Some(evt) => evt,
@@ -331,7 +323,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// timeout is reached (then `None` is returned).
     ///
     /// If the node has been closed, `Event::Closed` will be returned immediately.
-    #[inline]
     pub fn receive_timeout(&self, timeout: Duration) -> Option<Event<M, N, I>> {
         match self.events.get_timeout(timeout) {
             Some(Some(evt)) => Some(evt),
@@ -341,7 +332,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     }
 
     /// The id of this node
-    #[inline]
     pub fn node_id(&self) -> N {
         self.node_id.clone()
     }
@@ -366,7 +356,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     }
 
     /// Whether this node is connected to the given node
-    #[inline]
     pub fn is_connected(&self, id: &N) -> bool {
         self.connections.read().expect("Lock poisoned").contains_key(id)
     }
@@ -398,7 +387,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// `serde` and the node must be connected to the destination.
     /// It is possible to send messages to the node itself by using its address.
     /// If no connection to the destination exists, an error is returned.
-    #[inline]
     pub fn send(&self, dst: &N, msg: &M) -> Result<(), Error<N>> {
         if dst == &self.node_id {
             self.handle_message(dst.clone(), msg.clone());
@@ -419,7 +407,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// initialization messages have been exchanged.
     ///
     /// For more details see [`connect(...)`](#method.connect).
-    #[inline]
     pub fn connect_request<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
@@ -441,7 +428,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     ///
     /// Note 2: It is possible to connect the node to itself. However, messages will just be
     ///         short-circuited and the connection will not be used and closed after the timeout.
-    #[inline]
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<N, Error<N>> {
         let req = try!(self.connect_request(addr));
         let id = req.node_id().clone();
@@ -460,7 +446,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         thread::spawn(move || con.run());
     }
 
-    #[inline]
     fn close(&self) -> Result<(), Error<N>> {
         self.events.put(Event::Closing);
         *self.closed.write().expect("Lock poisoned") = true;
@@ -480,7 +465,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
 
 impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> where N: Rand {
     /// Create a new node with a random id
-    #[inline]
     pub fn with_random_id(init: I) -> CloseGuard<M, N, I> {
         Node::new(rand::random::<N>(), init)
     }
@@ -488,7 +472,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> where N: Rand {
 
 impl<M: Message, N: NodeId> Node<M, N, ()> {
     /// Create a new node with a random id
-    #[inline]
     pub fn without_init(node_id: N) -> CloseGuard<M, N, ()> {
         Node::new(node_id, ())
     }
@@ -496,7 +479,6 @@ impl<M: Message, N: NodeId> Node<M, N, ()> {
 
 impl<M: Message, N: NodeId> Node<M, N, ()> where N: Rand {
     /// Create a new node with a random id and without init message
-    #[inline]
     pub fn create_default() -> CloseGuard<M, N, ()> {
         Node::new(rand::random::<N>(), ())
     }
