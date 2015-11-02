@@ -35,7 +35,7 @@
 //!
 //! # Examples
 //! To use this crate, first a [`Node`](struct.Node.html) has to be created with a node id and an
-//! initialization message that contains this id and which is sent to other nodes as first message.
+//! initialization message which are sent to other nodes as first message.
 //!
 //! ```
 //! use msgpacknet::*;
@@ -52,7 +52,7 @@
 //! node.listen_defaults().expect("Failed to bind");
 //! ```
 //!
-//! The actual address can be obtained using
+//! The actual addresses can be obtained using
 //! [`node.addresses()`](struct.Node.html#method.addresses).
 //!
 //! ```

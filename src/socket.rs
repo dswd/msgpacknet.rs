@@ -87,7 +87,7 @@ pub enum Event<M: Message, N: NodeId, I: InitMessage> {
     /// has to be called.
     ///
     /// Note: The connection has not been registered in the node and can't be used to send any
-    /// messages yet.
+    ///       messages yet.
     ConnectionRequest(ConnectionRequest<M, N, I>),
 
     /// A new estasblished connection
@@ -102,10 +102,10 @@ pub enum Event<M: Message, N: NodeId, I: InitMessage> {
     /// send messages.
     ///
     /// Note: This event is emitted after the connection has been closed and unregistered,
-    /// so it can't be used to send final messages on that connection.
+    ///       so it can't be used to send final messages on that connection.
     ///
     /// Note 2: This event will not be emitted if a duplicate connection to the same node is
-    /// closed.
+    ///         closed.
     Disconnected(N),
 
     /// Node closing
@@ -270,7 +270,9 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// be started to handle incoming connections. The node can listen on multiple addresses.
     /// The result of this method, if successful, is the actual address used.
     ///
-    /// Note: a port of `0` has the special meaning of taking a random free port.
+    /// Note: A port of `0` has the special meaning of taking a random free port. If the host part
+    ///       of the address is `"0.0.0.0"` or `"[::0]"` the socket will be opened listening on
+    ///       all available IPv4 or IPv6 addresses.
     pub fn listen<A: ToSocketAddrs>(&self, addr: A) -> Result<SocketAddr, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
@@ -287,11 +289,11 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
 
     /// Listen on the addresses `"0.0.0.0:0"` and `"[::0]:0"`
     ///
-    /// This will open sockets for IPv4 and IPv6 (see [`listen`](struct.Node.html#method.listen)
-    /// for details).
+    /// This will open sockets for IPv4 and IPv6 (see
+    /// [`listen(...)`](struct.Node.html#method.listen) for details).
     ///
     /// Note: This method will always open two new sockets, regardless of whether sockets are
-    /// already open.
+    ///       already open.
     #[inline]
     pub fn listen_defaults(&self) -> Result<(), Error<N>> {
         try!(self.listen("0.0.0.0:0"));
@@ -417,10 +419,10 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// initialization messages have been exchanged.
     ///
     /// Note: This connection will automatically be closed when it becomes idle for longer than the
-    /// [specified timeout](trait.Callback.html#method.connection_timeout).
+    ///       [specified timeout](trait.Callback.html#method.connection_timeout).
     ///
     /// Note 2: It is possible to connect the node to itself. However, messages will just be
-    /// short-circuited and the connection will not be used and closed after the timeout.
+    ///         short-circuited and the connection will not be used and closed after the timeout.
     #[inline]
     pub fn connect_request<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
@@ -439,10 +441,10 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// initialization messages have been exchanged.
     ///
     /// Note: This connection will automatically be closed when it becomes idle for longer than the
-    /// [specified timeout](trait.Callback.html#method.connection_timeout).
+    ///       [specified timeout](trait.Callback.html#method.connection_timeout).
     ///
     /// Note 2: It is possible to connect the node to itself. However, messages will just be
-    /// short-circuited and the connection will not be used and closed after the timeout.
+    ///         short-circuited and the connection will not be used and closed after the timeout.
     #[inline]
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<N, Error<N>> {
         let req = try!(self.connect_request(addr));
@@ -533,8 +535,7 @@ pub struct ConnectionStats {
 /// message exchange. The request contains the initialization message that has been received from
 /// the remote side.
 ///
-/// To accept the request, the method `accept(...)` has to be called with the id of the remote node
-/// that has been determined based on the initialization message.
+/// To accept the request, the method `accept()` has to be called.
 ///
 /// To reject the connection request, the object can be dropped or the method `reject()` can be
 /// called.
