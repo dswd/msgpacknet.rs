@@ -2,7 +2,7 @@
 name = "msgpacknet"
 version = "0.1.0"
 authors = ["Dennis Schwerdel <schwerdel@googlemail.com>"]
-license = "GPL-3"
+license = "GPL-3.0"
 description = "A networking layer based on MessagePack messages."
 homepage = "https://github.com/dswd/msgpacknet.rs"
 repository = "https://github.com/dswd/msgpacknet.rs"
