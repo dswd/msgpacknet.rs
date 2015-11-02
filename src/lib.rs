@@ -18,8 +18,7 @@
 //! should be enough to expect uniqueness).
 //!
 //! * [`InitMessage`](trait.InitMessage.html) - The first message exchanged on all connections uses
-//! the `InitMessage` trait instead of `Message`. This first message must include the
-//! `NodeId` of the sender to identify it.
+//! the `InitMessage` trait instead of `Message`.
 //!
 //! # Low-level protocol
 //! When establishing a new connection (either incoming or outgoing), first an `InitMessage` is
