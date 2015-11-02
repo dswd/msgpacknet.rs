@@ -94,8 +94,10 @@
 //! let event = node.receive();
 //! ```
 
-//#![cfg_attr(test, feature(test))]
+// This crate is tageted for Rust 1.4 stable
+
 #![cfg_attr(test, feature(test))]
+#![feature(wait_timeout)] // Not stable in 1.4
 extern crate serde;
 extern crate rmp_serde;
 extern crate net2;
