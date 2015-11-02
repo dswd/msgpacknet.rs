@@ -290,6 +290,12 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         addrs
     }
 
+    /// Receive an event
+    ///
+    /// This method returns the next event received. If events are queued, the oldest queued event
+    /// will be returned. Otherwise, the call will block until an event is received.
+    ///
+    /// If the node has been closed, `Event::Closed` will be returned immediately.
     pub fn receive(&self) -> Event<M, N, I> {
         match self.events.get() {
             Some(evt) => evt,
@@ -297,6 +303,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         }
     }
 
+    /// Receive an event with timeout
+    ///
+    /// This method returns the next event received. If events are queued, the oldest queued event
+    /// will be returned. Otherwise, the call will block until an event is received or the given
+    /// timeout is reached (then `None` is returned).
+    ///
+    /// If the node has been closed, `Event::Closed` will be returned immediately.
     pub fn receive_timeout(&self, timeout: Duration) -> Option<Event<M, N, I>> {
         match self.events.get_timeout(timeout) {
             Some(Some(evt)) => Some(evt),
@@ -425,9 +438,21 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
 }
 
 impl<M: Message, N: NodeId + InitMessage> Node<M, N, N> where N: Rand {
+    /// Create a new node with a random id
     pub fn with_random_id() -> CloseGuard<M, N, N> {
         let id = rand::random::<N>();
         Node::new(id.clone(), id)
+    }
+}
+
+impl<M: Message, N: NodeId, I: InitMessage> Iterator for Node<M, N, I> {
+    type Item = Event<M, N, I>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.receive() {
+            Event::Closed => None,
+            evt @ _ => Some(evt)
+        }
     }
 }
 
@@ -454,6 +479,17 @@ pub struct ConnectionStats {
 }
 
 
+/// The request to establish a connection
+///
+/// This request is created for all new connections before they can be registered and used for
+/// message exchange. The request contains the initialization message that has been received from
+/// the remote side.
+///
+/// To accept the request, the method `accept(...)` has to be called with the id of the remote node
+/// that has been determined based on the initialization message.
+///
+/// To reject the connection request, the object can be dropped or the method `reject()` can be
+/// called.
 pub struct ConnectionRequest<M: Message, N: NodeId, I: InitMessage> {
     node: Node<M, N, I>,
     socket: TcpStream,
@@ -472,7 +508,6 @@ impl<M: Message, N: NodeId, I: InitMessage> fmt::Debug for ConnectionRequest<M, 
         write!(fmt, "ConnectionRequest(from: {:?}, init: {:?})", self.socket.peer_addr().unwrap(), self.init)
     }
 }
-
 
 impl<M: Message, N: NodeId, I: InitMessage> ConnectionRequest<M, N, I> {
     fn new(node: Node<M, N, I>, mut socket: TcpStream) -> Result<Self, Error<N>> {
