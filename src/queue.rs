@@ -1,5 +1,6 @@
 use std::sync::{Mutex, Arc, Condvar};
 use std::collections::VecDeque;
+#[cfg(feature = "nightly")]
 use std::time::Duration;
 
 pub struct QueueInner<T> {
@@ -26,6 +27,7 @@ impl<T> Queue<T> {
         Some(lock.0.pop_front().unwrap())
     }
 
+    #[cfg(feature = "nightly")]
     pub fn get_timeout(&self, timeout: Duration) -> Option<Option<T>> {
         let mut lock = self.0.msgs.lock().expect("Lock poisoned");
         while lock.1 && lock.0.is_empty() {

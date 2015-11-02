@@ -324,6 +324,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// timeout is reached (then `None` is returned).
     ///
     /// If the node has been closed, `Event::Closed` will be returned immediately.
+    #[cfg(feature = "nightly")]
     pub fn receive_timeout(&self, timeout: Duration) -> Option<Event<M, N, I>> {
         match self.events.get_timeout(timeout) {
             Some(Some(evt)) => Some(evt),

@@ -1,6 +1,7 @@
 use super::*;
 
 use test::Bencher;
+#[cfg(feature = "nightly")]
 use std::time::Duration;
 
 #[test]
@@ -22,7 +23,7 @@ fn node_send_self(b: &mut Bencher) {
     assert!(node.listen("localhost:0").is_ok());
     b.iter(|| {
         assert!(node.send(&0, &42).is_ok());
-        assert_eq!(node.receive_timeout(Duration::from_secs(1)).unwrap(), Event::Message(0, 42))
+        assert_eq!(node.receive(), Event::Message(0, 42))
     });
     assert!(!node.is_connected(&0));
 }
@@ -36,15 +37,14 @@ fn node_connect() {
     assert!(!client.is_connected(&0));
     assert!(client.connect(server.addresses()[0]).is_ok());
     assert!(client.is_connected(&0));
-    let evt = server.receive_timeout(Duration::from_secs(1));
-    assert!(evt.is_some());
-    if let Event::ConnectionRequest(req) = evt.unwrap() {
+    let evt = server.receive();
+    if let Event::ConnectionRequest(req) = evt {
         req.accept();
     } else {
         assert!(false);
     }
     assert!(server.is_connected(&1));
-    assert_eq!(client.receive_timeout(Duration::from_secs(1)).unwrap(), Event::Connected(0));
+    assert_eq!(client.receive(), Event::Connected(0));
 }
 
 #[bench]
@@ -54,15 +54,15 @@ fn node_send_remote(b: &mut Bencher) {
     let client = Node::new(1, 1);
     assert!(client.listen("localhost:0").is_ok());
     assert!(client.connect(server.addresses()[0]).is_ok());
-    if let Event::ConnectionRequest(req) = server.receive_timeout(Duration::from_secs(1)).unwrap() {
+    if let Event::ConnectionRequest(req) = server.receive() {
         req.accept();
     } else {
         assert!(false);
     }
-    assert_eq!(client.receive_timeout(Duration::from_secs(1)).unwrap(), Event::Connected(0));
-    assert_eq!(server.receive_timeout(Duration::from_secs(1)).unwrap(), Event::Connected(1));
+    assert_eq!(client.receive(), Event::Connected(0));
+    assert_eq!(server.receive(), Event::Connected(1));
     b.iter(|| {
         assert!(client.send(&0, &42).is_ok());
-        assert_eq!(server.receive_timeout(Duration::from_secs(1)).unwrap(), Event::Message(1, 42))
+        assert_eq!(server.receive(), Event::Message(1, 42))
     });
 }
