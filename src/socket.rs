@@ -418,11 +418,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// This method blocks until the underlying connection has been established and the
     /// initialization messages have been exchanged.
     ///
-    /// Note: This connection will automatically be closed when it becomes idle for longer than the
-    ///       [specified timeout](trait.Callback.html#method.connection_timeout).
-    ///
-    /// Note 2: It is possible to connect the node to itself. However, messages will just be
-    ///         short-circuited and the connection will not be used and closed after the timeout.
+    /// For more details see [`connect(...)`](#method.connect).
     #[inline]
     pub fn connect_request<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
@@ -441,7 +437,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// initialization messages have been exchanged.
     ///
     /// Note: This connection will automatically be closed when it becomes idle for longer than the
-    ///       [specified timeout](trait.Callback.html#method.connection_timeout).
+    ///       [specified timeout](#method.set_connection_timeout).
     ///
     /// Note 2: It is possible to connect the node to itself. However, messages will just be
     ///         short-circuited and the connection will not be used and closed after the timeout.

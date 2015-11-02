@@ -75,7 +75,7 @@
 //! let peer_id = node.connect(addr).expect("Failed to connect");
 //! ```
 //!
-//! Then, messages can be sent via [`node.send(...)`](struct.Node.html#method.send)...
+//! Then, messages can be sent via [`send(...)`](struct.Node.html#method.send)...
 //!
 //! ```
 //! # use msgpacknet::*;
@@ -85,7 +85,7 @@
 //! node.send(&peer_id, &msg).expect("Failed to send");
 //! ```
 //!
-//! ...and received via [`callback.receive()`](struct.SimpleCallback.html#method.receive).
+//! ...and received via [`receive()`](struct.Node.html#method.receive).
 //!
 //! ```
 //! # use msgpacknet::*;
