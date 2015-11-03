@@ -1,4 +1,4 @@
-use std::sync::{Mutex, Arc, Condvar};
+use std::sync::{Arc, Condvar, Mutex};
 use std::collections::VecDeque;
 #[cfg(feature = "nightly")]
 use std::time::Duration;
@@ -13,7 +13,10 @@ pub struct Queue<T>(Arc<QueueInner<T>>);
 
 impl<T> Queue<T> {
     pub fn new() -> Self {
-        Queue(Arc::new(QueueInner{msgs: Mutex::new((VecDeque::new(), true)), waiter: Condvar::new()}))
+        Queue(Arc::new(QueueInner {
+            msgs: Mutex::new((VecDeque::new(), true)),
+            waiter: Condvar::new(),
+        }))
     }
 
     pub fn get(&self) -> Option<T> {
@@ -31,7 +34,10 @@ impl<T> Queue<T> {
     pub fn get_timeout(&self, timeout: Duration) -> Option<Option<T>> {
         let mut lock = self.0.msgs.lock().expect("Lock poisoned");
         while lock.1 && lock.0.is_empty() {
-            let (new_lock, result) = self.0.waiter.wait_timeout(lock, timeout).expect("Lock poisoned");
+            let (new_lock, result) = self.0
+                                         .waiter
+                                         .wait_timeout(lock, timeout)
+                                         .expect("Lock poisoned");
             if result.timed_out() {
                 return None;
             }

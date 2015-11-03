@@ -1,20 +1,20 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use net2::TcpStreamExt;
 use rmp_serde;
 use rand::{self, Rand};
 
-use std::net::{TcpListener, TcpStream, ToSocketAddrs, Shutdown, SocketAddr};
-use std::sync::{RwLock, Arc, Mutex};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
+use std::sync::{Arc, Mutex, RwLock};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::{mem, fmt};
+use std::{fmt, mem};
 use std::time::Duration;
 use std::thread::{self, JoinHandle};
 use std::io::{self, BufWriter};
 
-use super::stats::{Stats, StatReader, StatWriter};
+use super::stats::{StatReader, StatWriter, Stats};
 use super::queue::Queue;
 
 
@@ -45,7 +45,9 @@ impl<T> InitMessage for T where T: Serialize + Deserialize + Send + Sync + Clone
 
 /// The error type used througout the crate
 #[derive(Debug)]
-pub enum Error<N> where N: NodeId {
+pub enum Error<N>
+    where N: NodeId
+{
     /// The node has already been closed
     AlreadyClosed,
 
@@ -68,7 +70,7 @@ pub enum Error<N> where N: NodeId {
     ConnectionAborted,
 
     /// Failed to close a socket
-    CloseError(io::Error)
+    CloseError(io::Error),
 }
 
 
@@ -119,7 +121,7 @@ pub enum Event<M: Message, N: NodeId, I: InitMessage> {
     ///
     /// This event is emitted whenever the node has shut down. At this time, all connections
     /// have been closed and no final messages can be sent.
-    Closed
+    Closed,
 }
 
 
@@ -148,7 +150,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Deref for CloseGuard<M, N, I> {
 /// Node statistics
 pub struct NodeStats<N: NodeId> {
     /// Statistics for all connections
-    pub connections: HashMap<N, ConnectionStats>
+    pub connections: HashMap<N, ConnectionStats>,
 }
 
 
@@ -204,7 +206,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// the first message sent automatically to other nodes when connected.
     /// The result of this call is a guard that closes the node if dropped.
     pub fn new(node_id: N, init_message: I) -> CloseGuard<M, N, I> {
-        CloseGuard(Node(Arc::new(NodeInner{
+        CloseGuard(Node(Arc::new(NodeInner {
             node_id: node_id,
             events: Queue::new(),
             sockets: Mutex::new(Vec::new()),
@@ -273,7 +275,8 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
             return Err(Error::AlreadyClosed);
         }
         let mut nodes = self.sockets.lock().expect("Lock poisoned");
-        let node: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr).map_err(|err| Error::OpenError(err))));
+        let node: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr)
+                                                       .map_err(|err| Error::OpenError(err))));
         let cloned_self = self.clone();
         let cloned_node = node.clone();
         let used_addr = node.local_addr().expect("Failed to get local address");
@@ -298,7 +301,8 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// The addresses of this node
     pub fn addresses(&self) -> Vec<SocketAddr> {
         let mut addrs = Vec::new();
-        for &(ref sock, _) in &self.sockets.lock().expect("Lock poisoned") as &Vec<(Arc<TcpListener>, _)> {
+        for &(ref sock, _) in
+            &self.sockets.lock().expect("Lock poisoned") as &Vec<(Arc<TcpListener>, _)> {
             addrs.push(sock.local_addr().expect("Failed to obtain address"));
         }
         addrs
@@ -313,7 +317,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     pub fn receive(&self) -> Event<M, N, I> {
         match self.events.get() {
             Some(evt) => evt,
-            None => Event::Closed
+            None => Event::Closed,
         }
     }
 
@@ -329,7 +333,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         match self.events.get_timeout(timeout) {
             Some(Some(evt)) => Some(evt),
             Some(None) => Some(Event::Closed),
-            None => None
+            None => None,
         }
     }
 
@@ -368,7 +372,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
 
     /// The statistics of this node
     pub fn stats(&self) -> NodeStats<N> {
-        let mut stats = NodeStats{connections: HashMap::new()};
+        let mut stats = NodeStats { connections: HashMap::new() };
         for (id, con) in self.connections.read().expect("Lock poisoned").iter() {
             stats.connections.insert(id.clone(), con.stats());
         }
@@ -396,7 +400,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         }
         match self.get_connection(dst) {
             Some(con) => con.send(msg),
-            None => Err(Error::NotConnected(dst.clone()))
+            None => Err(Error::NotConnected(dst.clone())),
         }
     }
 
@@ -409,7 +413,9 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// initialization messages have been exchanged.
     ///
     /// For more details see [`connect(...)`](#method.connect).
-    pub fn connect_request<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
+    pub fn connect_request<A: ToSocketAddrs>(&self,
+                                             addr: A)
+                                             -> Result<ConnectionRequest<M, N, I>, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
@@ -438,7 +444,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     }
 
     fn shutdown_socket(&self, socket: &TcpListener) -> Result<(), Error<N>> {
-        //TODO: Remove this workaround once a proper API is available
+        // TODO: Remove this workaround once a proper API is available
         let socket = unsafe { mem::transmute::<&TcpListener, &TcpStream>(socket) };
         socket.shutdown(Shutdown::Both).map_err(|e| Error::CloseError(e))
     }
@@ -505,7 +511,7 @@ pub struct ConnectionStats {
     pub read_rate: f64,
 
     /// The current idle time of reading side
-    pub read_idle: Duration
+    pub read_idle: Duration,
 }
 
 
@@ -528,31 +534,43 @@ pub struct ConnectionRequest<M: Message, N: NodeId, I: InitMessage> {
 
 impl<M: Message, N: NodeId, I: InitMessage> PartialEq for ConnectionRequest<M, N, I> {
     fn eq(&self, other: &Self) -> bool {
-        self.node_id == other.node_id
-        && self.socket.peer_addr().unwrap() == other.socket.peer_addr().unwrap()
-        && self.socket.local_addr().unwrap() == other.socket.local_addr().unwrap()
+        self.node_id == other.node_id &&
+        self.socket.peer_addr().unwrap() == other.socket.peer_addr().unwrap() &&
+        self.socket.local_addr().unwrap() == other.socket.local_addr().unwrap()
     }
 }
 
 impl<M: Message, N: NodeId, I: InitMessage> fmt::Debug for ConnectionRequest<M, N, I> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "ConnectionRequest(from: {:?}, node_id: {:?}, init: {:?})", self.socket.peer_addr().unwrap(), self.node_id, self.init)
+        write!(fmt,
+               "ConnectionRequest(from: {:?}, node_id: {:?}, init: {:?})",
+               self.socket.peer_addr().unwrap(),
+               self.node_id,
+               self.init)
     }
 }
 
 impl<M: Message, N: NodeId, I: InitMessage> ConnectionRequest<M, N, I> {
     fn new(node: Node<M, N, I>, mut socket: TcpStream) -> Result<Self, Error<N>> {
         try!(socket.set_nodelay(true).map_err(|err| Error::ConnectionError(err)));
-        try!(socket.set_read_timeout(Some(node.connection_timeout())).map_err(|err| Error::ConnectionError(err)));
+        try!(socket.set_read_timeout(Some(node.connection_timeout()))
+                   .map_err(|err| Error::ConnectionError(err)));
         {
             let mut writer = rmp_serde::Serializer::new(&mut socket);
-            try!((node.init_message(), node.node_id()).serialize(&mut writer).map_err(|_| Error::SendError));
+            try!((node.init_message(), node.node_id())
+                     .serialize(&mut writer)
+                     .map_err(|_| Error::SendError));
         }
         let (init, node_id) = {
             let mut reader = rmp_serde::Deserializer::new(&socket);
             try!(Deserialize::deserialize(&mut reader).map_err(|_| Error::ReadError))
         };
-        Ok(ConnectionRequest{node: node, socket: socket, init: init, node_id: node_id})
+        Ok(ConnectionRequest {
+            node: node,
+            socket: socket,
+            init: init,
+            node_id: node_id,
+        })
     }
 
     /// The initialization message received from the remote side.
@@ -588,7 +606,7 @@ pub struct ConnectionInner<M: Message, N: NodeId, I: InitMessage> {
     writer_stats: Arc<RwLock<Stats>>,
     reader: Mutex<rmp_serde::Deserializer<StatReader<TcpStream>>>,
     reader_stats: Arc<RwLock<Stats>>,
-    node_id: N
+    node_id: N,
 }
 
 
@@ -605,19 +623,21 @@ impl<M: Message, N: NodeId, I: InitMessage> Deref for Connection<M, N, I> {
 
 impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
     fn new(node: Node<M, N, I>, socket: TcpStream, node_id: N) -> Self {
-        let writer = StatWriter::new(socket.try_clone().expect("Failed to clone socket"), node.stats_halflife_time());
+        let writer = StatWriter::new(socket.try_clone().expect("Failed to clone socket"),
+                                     node.stats_halflife_time());
         let writer_stats = writer.stats();
-        let input = StatReader::new(socket.try_clone().expect("Failed to clone socket"), node.stats_halflife_time());
+        let input = StatReader::new(socket.try_clone().expect("Failed to clone socket"),
+                                    node.stats_halflife_time());
         let reader_stats = input.stats();
         let reader = rmp_serde::Deserializer::new(input);
-        Connection(Arc::new(ConnectionInner{
+        Connection(Arc::new(ConnectionInner {
             node: node,
             writer: Mutex::new(writer),
             writer_stats: writer_stats,
             reader: Mutex::new(reader),
             reader_stats: reader_stats,
             socket: Mutex::new(socket),
-            node_id: node_id
+            node_id: node_id,
         }))
     }
 
@@ -628,13 +648,13 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
     fn stats(&self) -> ConnectionStats {
         let reader_stats = self.reader_stats.read().expect("Lock poisoned");
         let writer_stats = self.writer_stats.read().expect("Lock poisoned");
-        ConnectionStats{
+        ConnectionStats {
             write_total: writer_stats.total(),
             write_rate: writer_stats.rate(),
             write_idle: writer_stats.idle_time(),
             read_total: reader_stats.total(),
             read_rate: reader_stats.rate(),
-            read_idle: reader_stats.idle_time()
+            read_idle: reader_stats.idle_time(),
         }
     }
 
@@ -660,6 +680,10 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
     }
 
     fn close(&self) -> Result<(), Error<N>> {
-        Ok(try!(self.socket.lock().expect("Lock poisoned").shutdown(Shutdown::Both).map_err(|err| Error::CloseError(err))))
+        Ok(try!(self.socket
+                    .lock()
+                    .expect("Lock poisoned")
+                    .shutdown(Shutdown::Both)
+                    .map_err(|err| Error::CloseError(err))))
     }
 }

@@ -1,4 +1,4 @@
-use std::io::{self, Write, Read};
+use std::io::{self, Read, Write};
 use std::time::Duration;
 use std::sync::{Arc, RwLock};
 
@@ -17,31 +17,37 @@ pub struct Stats {
     total: u64,
     rate: f64,
     last: f64,
-    halftime: f64
+    halftime: f64,
 }
 
 impl Stats {
     pub fn new(halftime: Duration) -> Self {
-        Stats{total: 0, rate: 0.0, last: now_as_float(), halftime: duration_as_float(halftime)}
+        Stats {
+            total: 0,
+            rate: 0.0,
+            last: now_as_float(),
+            halftime: duration_as_float(halftime),
+        }
     }
 
     pub fn update(&mut self, amount: usize) {
         self.total += amount as u64;
         let now = now_as_float();
-        let alpha = 0.5f64.powf((now-self.last)/self.halftime);
+        let alpha = 0.5f64.powf((now - self.last) / self.halftime);
         self.rate = self.rate * alpha + amount as f64 * (1.0f64 - alpha);
         self.last = now;
     }
 
     pub fn rate(&self) -> f64 {
         let now = now_as_float();
-        let alpha = 0.5f64.powf((now-self.last)/self.halftime);
+        let alpha = 0.5f64.powf((now - self.last) / self.halftime);
         self.rate * alpha
     }
 
     pub fn idle_time(&self) -> Duration {
         let diff = now_as_float() - self.last;
-        Duration::new(diff.floor() as u64, ((diff - diff.floor())*1000000000.0) as u32)
+        Duration::new(diff.floor() as u64,
+                      ((diff - diff.floor()) * 1000000000.0) as u32)
     }
 
     pub fn total(&self) -> u64 {
@@ -52,12 +58,15 @@ impl Stats {
 
 pub struct StatWriter<T> {
     inner: T,
-    stats: Arc<RwLock<Stats>>
+    stats: Arc<RwLock<Stats>>,
 }
 
 impl<T> StatWriter<T> {
     pub fn new(inner: T, halflife: Duration) -> Self {
-        StatWriter{inner: inner, stats: Arc::new(RwLock::new(Stats::new(halflife)))}
+        StatWriter {
+            inner: inner,
+            stats: Arc::new(RwLock::new(Stats::new(halflife))),
+        }
     }
 
     pub fn stats(&self) -> Arc<RwLock<Stats>> {
@@ -80,12 +89,15 @@ impl<T: Write> Write for StatWriter<T> {
 
 pub struct StatReader<T> {
     inner: T,
-    stats: Arc<RwLock<Stats>>
+    stats: Arc<RwLock<Stats>>,
 }
 
 impl<T> StatReader<T> {
     pub fn new(inner: T, halflife: Duration) -> Self {
-        StatReader{inner: inner, stats: Arc::new(RwLock::new(Stats::new(halflife)))}
+        StatReader {
+            inner: inner,
+            stats: Arc::new(RwLock::new(Stats::new(halflife))),
+        }
     }
 
     pub fn stats(&self) -> Arc<RwLock<Stats>> {
