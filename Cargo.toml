@@ -7,6 +7,7 @@ description = "A networking layer based on MessagePack messages."
 homepage = "https://github.com/dswd/msgpacknet.rs"
 repository = "https://github.com/dswd/msgpacknet.rs"
 documentation = "http://dswd.github.io/msgpacknet.rs/msgpacknet/index.html"
+keywords = ["networking", "transport", "protocol", "msgpack", "messagepack"]
 
 [dependencies]
 serde = "0.6"
