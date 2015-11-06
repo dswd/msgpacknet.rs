@@ -24,10 +24,8 @@ impl<T> Queue<T> {
         while lock.1 && lock.0.is_empty() {
             lock = self.0.waiter.wait(lock).expect("Lock poisoned");
         }
-        if !lock.1 && lock.0.is_empty() {
-            return None;
-        }
-        Some(lock.0.pop_front().unwrap())
+        debug_assert!(lock.1 || !lock.0.is_empty());
+        lock.0.pop_front()
     }
 
     #[cfg(feature = "nightly")]
@@ -43,10 +41,8 @@ impl<T> Queue<T> {
             }
             lock = new_lock;
         }
-        if !lock.1 && lock.0.is_empty() {
-            return Some(None);
-        }
-        Some(Some(lock.0.pop_front().unwrap()))
+        debug_assert!(lock.1 || !lock.0.is_empty());
+        Some(lock.0.pop_front())
     }
 
     pub fn close(&self) {
