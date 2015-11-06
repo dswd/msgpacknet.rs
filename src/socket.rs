@@ -12,7 +12,7 @@ use std::hash::Hash;
 use std::{fmt, mem};
 use std::time::Duration;
 use std::thread::{self, JoinHandle};
-use std::io::{self, BufWriter};
+use std::io::BufWriter;
 
 use super::stats::{StatReader, StatWriter, Stats};
 use super::queue::Queue;
@@ -44,7 +44,7 @@ impl<T> InitMessage for T where T: Serialize + Deserialize + Send + Sync + Clone
 
 
 /// The error type used througout the crate
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Hash, Ord, Eq, PartialOrd)]
 pub enum Error<N>
     where N: NodeId
 {
@@ -52,10 +52,10 @@ pub enum Error<N>
     AlreadyClosed,
 
     /// Failed to open a node socket
-    OpenError(io::Error),
+    OpenError,
 
     /// Failed to establish a connection
-    ConnectionError(io::Error),
+    ConnectionError,
 
     /// Failed to send a message
     SendError,
@@ -70,7 +70,7 @@ pub enum Error<N>
     ConnectionAborted,
 
     /// Failed to close a socket
-    CloseError(io::Error),
+    CloseError,
 }
 
 
@@ -275,8 +275,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
             return Err(Error::AlreadyClosed);
         }
         let mut nodes = self.sockets.lock().expect("Lock poisoned");
-        let node: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr)
-                                                       .map_err(|err| Error::OpenError(err))));
+        let node: Arc<TcpListener> = Arc::new(try!(TcpListener::bind(addr).map_err(|_| Error::OpenError)));
         let cloned_self = self.clone();
         let cloned_node = node.clone();
         let used_addr = node.local_addr().expect("Failed to get local address");
@@ -381,7 +380,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
 
     fn run_node(&self, socket: Arc<TcpListener>) -> Result<(), Error<N>> {
         loop {
-            let (sock, _) = try!(socket.accept().map_err(|e| Error::ConnectionError(e)));
+            let (sock, _) = try!(socket.accept().map_err(|_| Error::ConnectionError));
             let req = try!(ConnectionRequest::new(self.clone(), sock));
             self.events.put(Event::ConnectionRequest(req));
         }
@@ -417,7 +416,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
-        let sock = try!(TcpStream::connect(addr).map_err(|err| Error::ConnectionError(err)));
+        let sock = try!(TcpStream::connect(addr).map_err(|_| Error::ConnectionError));
         Ok(try!(ConnectionRequest::new(self.clone(), sock)))
     }
 
@@ -460,7 +459,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     fn shutdown_socket(&self, socket: &TcpListener) -> Result<(), Error<N>> {
         // TODO: Remove this workaround once a proper API is available
         let socket = unsafe { mem::transmute::<&TcpListener, &TcpStream>(socket) };
-        socket.shutdown(Shutdown::Both).map_err(|e| Error::CloseError(e))
+        socket.shutdown(Shutdown::Both).map_err(|_| Error::CloseError)
     }
 
     fn accept_connection(&self, con: Connection<M, N, I>) {
@@ -566,9 +565,9 @@ impl<M: Message, N: NodeId, I: InitMessage> fmt::Debug for ConnectionRequest<M, 
 
 impl<M: Message, N: NodeId, I: InitMessage> ConnectionRequest<M, N, I> {
     fn new(node: Node<M, N, I>, mut socket: TcpStream) -> Result<Self, Error<N>> {
-        try!(socket.set_nodelay(true).map_err(|err| Error::ConnectionError(err)));
+        try!(socket.set_nodelay(true).map_err(|_| Error::ConnectionError));
         try!(socket.set_read_timeout(Some(node.connection_timeout()))
-                   .map_err(|err| Error::ConnectionError(err)));
+                   .map_err(|_| Error::ConnectionError));
         {
             let mut writer = rmp_serde::Serializer::new(&mut socket);
             try!((node.init_message(), node.node_id())
@@ -698,10 +697,6 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
     }
 
     fn close(&self) -> Result<(), Error<N>> {
-        Ok(try!(self.socket
-                    .lock()
-                    .expect("Lock poisoned")
-                    .shutdown(Shutdown::Both)
-                    .map_err(|err| Error::CloseError(err))))
+        Ok(try!(self.socket.lock().expect("Lock poisoned").shutdown(Shutdown::Both).map_err(|_| Error::CloseError)))
     }
 }

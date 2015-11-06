@@ -89,3 +89,30 @@ fn node_lookup_connection() {
     assert!(client.connect(server.addresses()[0]).is_ok());
     assert_eq!(client.lookup_connection(server.addresses()[0]), Some(server.node_id()));
 }
+
+#[test]
+fn node_send_unconnected() {
+    let client = Node::<u64, u64, u64>::new(0, 0);
+    assert_eq!(Err(Error::NotConnected(1)), client.send(&1, &42));
+}
+
+#[test]
+fn node_listen_fail() {
+    let client = Node::<u64, u64, u64>::new(0, 0);
+    assert_eq!(Err(Error::OpenError), client.listen(""));
+}
+
+#[test]
+fn node_connect_fail() {
+    let client = Node::<u64, u64, u64>::new(0, 0);
+    assert_eq!(Err(Error::ConnectionError), client.connect(""));
+}
+
+#[test]
+fn node_closed_fail() {
+    let client = Node::<u64, u64, u64>::new(0, 0);
+    let dummy = client.clone();
+    drop(client);
+    assert_eq!(Err(Error::AlreadyClosed), dummy.connect(""));
+    assert_eq!(Err(Error::AlreadyClosed), dummy.listen(""));
+}
