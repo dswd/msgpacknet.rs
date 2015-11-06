@@ -78,3 +78,14 @@ fn node_send_remote() {
     assert!(client.send(&0, &42).is_ok());
     assert_eq!(server.receive(), Event::Message(1, 42));
 }
+
+#[test]
+fn node_lookup_connection() {
+    let server = Node::<u64, u64, u64>::new(0, 0);
+    assert!(server.listen("localhost:0").is_ok());
+    let client = Node::<u64, u64, u64>::new(1, 1);
+    assert!(client.listen("localhost:0").is_ok());
+    assert_eq!(client.lookup_connection(server.addresses()[0]), None);
+    assert!(client.connect(server.addresses()[0]).is_ok());
+    assert_eq!(client.lookup_connection(server.addresses()[0]), Some(server.node_id()));
+}
