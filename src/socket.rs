@@ -413,9 +413,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
     /// initialization messages have been exchanged.
     ///
     /// For more details see [`connect(...)`](#method.connect).
-    pub fn connect_request<A: ToSocketAddrs>(&self,
-                                             addr: A)
-                                             -> Result<ConnectionRequest<M, N, I>, Error<N>> {
+    pub fn connect_request<A: ToSocketAddrs>(&self, addr: A) -> Result<ConnectionRequest<M, N, I>, Error<N>> {
         if *self.closed.read().expect("Lock poisoned") {
             return Err(Error::AlreadyClosed);
         }
@@ -441,6 +439,22 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         let id = req.node_id().clone();
         req.accept();
         Ok(id)
+    }
+
+    /// Returns the node id for an address if connected
+    ///
+    /// This method retrns the node id for an address if a connection to this address exists.
+    pub fn lookup_connection<A: ToSocketAddrs>(&self, addr: A) -> Option<N> {
+        let lock = self.connections.read().expect("Lock poisoned");
+        for (id, con) in &lock as &HashMap<N, Connection<M, N, I>> {
+            let sock_addr = con.get_address();
+            for a in addr.to_socket_addrs().unwrap() {
+                if a == sock_addr {
+                    return Some(id.clone());
+                }
+            }
+        }
+        None
     }
 
     fn shutdown_socket(&self, socket: &TcpListener) -> Result<(), Error<N>> {
@@ -643,6 +657,10 @@ impl<M: Message, N: NodeId, I: InitMessage> Connection<M, N, I> {
 
     fn node_id(&self) -> &N {
         &self.node_id
+    }
+
+    fn get_address(&self) -> SocketAddr {
+        self.socket.lock().expect("Lock poisoned").peer_addr().unwrap()
     }
 
     fn stats(&self) -> ConnectionStats {
