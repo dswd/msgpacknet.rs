@@ -1,6 +1,6 @@
 [package]
 name = "msgpacknet"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Dennis Schwerdel <schwerdel@googlemail.com>"]
 license = "GPL-3.0"
 description = "A networking layer based on MessagePack messages."
