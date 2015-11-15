@@ -365,6 +365,11 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         self.connections.read().expect("Lock poisoned").contains_key(id)
     }
 
+    /// The number of fully established connections
+    pub fn connection_count(&self) -> usize {
+        self.connections.read().expect("Lock poisoned").len()
+    }
+
     fn get_connections(&self) -> Vec<Connection<M, N, I>> {
         self.connections.read().expect("Lock poisoned").values().map(|c| c.clone()).collect()
     }
@@ -467,7 +472,7 @@ impl<M: Message, N: NodeId, I: InitMessage> Node<M, N, I> {
         thread::spawn(move || con.run());
     }
 
-    fn close(&self) -> Result<(), Error<N>> {
+    pub fn close(&self) -> Result<(), Error<N>> {
         self.events.put(Event::Closing);
         *self.closed.write().expect("Lock poisoned") = true;
         let mut sockets = self.sockets.lock().expect("Lock poisoned");
