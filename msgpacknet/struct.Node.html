@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Node` struct in crate `msgpacknet`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Node">
+
+    <title>msgpacknet::Node - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>msgpacknet</a></p><script>window.sidebarCurrent = {name: 'Node', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>msgpacknet</a>::<wbr><a class='struct' href=''>Node</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-2688' class='srclink' href='../src/msgpacknet/socket.rs.html#192' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Node&lt;M: <a class='trait' href='../msgpacknet/trait.Message.html' title='msgpacknet::Message'>Message</a>, N: <a class='trait' href='../msgpacknet/trait.NodeId.html' title='msgpacknet::NodeId'>NodeId</a>, I: <a class='trait' href='../msgpacknet/trait.InitMessage.html' title='msgpacknet::InitMessage'>InitMessage</a>&gt;(_);</pre><div class='docblock'><p>The node struct</p>
+
+<p>This is a reference counted wrapper around the node data.
+This struct can be parametrized with the following types:</p>
+
+<ul>
+<li><code>M</code> a type implementing the <a href="trait.Message.html"><code>Message</code></a> trait that is used for all
+messages that are exchanged.</li>
+<li><code>N</code> a type implementing the <a href="trait.NodeId.html"><code>NodeId</code></a> trait that is used to identify and
+distinguish nodes.</li>
+<li><code>I</code> a type implementing the <a href="trait.InitMessage.html"><code>InitMessage</code></a> trait that is used for
+the first initialization message exchanged on any connection.</li>
+</ul>
+
+<p>There are several different constructors:</p>
+
+<ul>
+<li><a href="#method.new"><code>new(...)</code></a> creates a new node with a given node id and initialization message.</li>
+<li><a href="#method.without_init"><code>without_init(...)</code></a> creates a new node with a given node id but
+without initialization message.</li>
+<li><a href="#method.with_random_id"><code>with_random_id(...)</code></a> creates a new node with a random node id and
+given initialization message.</li>
+<li><a href="#method.create_default"><code>create_default()</code></a> creates a new node with a random node id and
+without initialization message.</li>
+</ul>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;M: <a class='trait' href='../msgpacknet/trait.Message.html' title='msgpacknet::Message'>Message</a>, N: <a class='trait' href='../msgpacknet/trait.NodeId.html' title='msgpacknet::NodeId'>NodeId</a>, I: <a class='trait' href='../msgpacknet/trait.InitMessage.html' title='msgpacknet::InitMessage'>InitMessage</a>&gt; <a class='struct' href='../msgpacknet/struct.Node.html' title='msgpacknet::Node'>Node</a>&lt;M, N, I&gt;</code></h3><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>(node_id: N, init_message: I) -&gt; <a class='struct' href='../msgpacknet/struct.CloseGuard.html' title='msgpacknet::CloseGuard'>CloseGuard</a>&lt;M, N, I&gt;</code></h4>
+<div class='docblock'><p>Create a new node</p>
+
+<p>The parameter <code>node_id</code> must be a unique identifier for this node and <code>init_message</code> is
+the first message sent automatically to other nodes when connected.
+The result of this call is a guard that closes the node if dropped.</p>
+</div><h4 id='method.set_connection_timeout' class='method'><code>fn <a href='#method.set_connection_timeout' class='fnname'>set_connection_timeout</a>(&amp;self, dur: <a class='struct' href='https://doc.rust-lang.org/nightly/std/time/duration/struct.Duration.html' title='std::time::duration::Duration'>Duration</a>)</code></h4>
+<div class='docblock'><p>Set the connection timeout</p>
+
+<p>Whenever a connection is idle longer than this timeout, it will be closed.
+The default value is 60 seconds.</p>
+
+<p>Note: Changes to this value only affect connections created after the change.</p>
+</div><h4 id='method.connection_timeout' class='method'><code>fn <a href='#method.connection_timeout' class='fnname'>connection_timeout</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/std/time/duration/struct.Duration.html' title='std::time::duration::Duration'>Duration</a></code></h4>
+<div class='docblock'><p>The connection timeout</p>
+</div><h4 id='method.set_stats_halflife_time' class='method'><code>fn <a href='#method.set_stats_halflife_time' class='fnname'>set_stats_halflife_time</a>(&amp;self, dur: <a class='struct' href='https://doc.rust-lang.org/nightly/std/time/duration/struct.Duration.html' title='std::time::duration::Duration'>Duration</a>)</code></h4>
+<div class='docblock'><p>Set the statistics half-life time</p>
+
+<p>This value is used as a parameter for the rolling average statistics of sending and
+receiving rates. Shorter durations react faster to changes and longer durations result in
+smoother behavior. The default value is 60 seconds.</p>
+
+<p>Note: Changes to this value only affect connections created after the change.</p>
+</div><h4 id='method.stats_halflife_time' class='method'><code>fn <a href='#method.stats_halflife_time' class='fnname'>stats_halflife_time</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/std/time/duration/struct.Duration.html' title='std::time::duration::Duration'>Duration</a></code></h4>
+<div class='docblock'><p>The statistics half-life time</p>
+</div><h4 id='method.set_init_message' class='method'><code>fn <a href='#method.set_init_message' class='fnname'>set_init_message</a>(&amp;self, init: I)</code></h4>
+<div class='docblock'><p>Set the initialization message</p>
+
+<p>This message is sent as a first message on all new connections and must identify the node.</p>
+</div><h4 id='method.init_message' class='method'><code>fn <a href='#method.init_message' class='fnname'>init_message</a>(&amp;self) -&gt; I</code></h4>
+<div class='docblock'><p>The initialization message</p>
+</div><h4 id='method.listen' class='method'><code>fn <a href='#method.listen' class='fnname'>listen</a>&lt;A: <a class='trait' href='https://doc.rust-lang.org/nightly/std/net/addr/trait.ToSocketAddrs.html' title='std::net::addr::ToSocketAddrs'>ToSocketAddrs</a>&gt;(&amp;self, addr: A) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='enum' href='https://doc.rust-lang.org/nightly/std/net/addr/enum.SocketAddr.html' title='std::net::addr::SocketAddr'>SocketAddr</a>, <a class='enum' href='../msgpacknet/enum.Error.html' title='msgpacknet::Error'>Error</a>&lt;N&gt;&gt;</code></h4>
+<div class='docblock'><p>Listen on the specified address</p>
+
+<p>This method will open a new node listening to the given address. A dedicated thread will
+be started to handle incoming connections. The node can listen on multiple addresses.
+The result of this method, if successful, is the actual address used.</p>
+
+<p>Note: A port of <code>0</code> has the special meaning of taking a random free port. If the host part
+      of the address is <code>&quot;0.0.0.0&quot;</code> or <code>&quot;[::0]&quot;</code> the socket will be opened listening on
+      all available IPv4 or IPv6 addresses.</p>
+</div><h4 id='method.listen_defaults' class='method'><code>fn <a href='#method.listen_defaults' class='fnname'>listen_defaults</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a class='enum' href='../msgpacknet/enum.Error.html' title='msgpacknet::Error'>Error</a>&lt;N&gt;&gt;</code></h4>
+<div class='docblock'><p>Listen on the addresses <code>&quot;0.0.0.0:0&quot;</code> and <code>&quot;[::0]:0&quot;</code></p>
+
+<p>This will open sockets for IPv4 and IPv6 (see
+<a href="struct.Node.html#method.listen"><code>listen(...)</code></a> for details).</p>
+
+<p>Note: This method will always open two new sockets, regardless of whether sockets are
+      already open.</p>
+</div><h4 id='method.addresses' class='method'><code>fn <a href='#method.addresses' class='fnname'>addresses</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='enum' href='https://doc.rust-lang.org/nightly/std/net/addr/enum.SocketAddr.html' title='std::net::addr::SocketAddr'>SocketAddr</a>&gt;</code></h4>
+<div class='docblock'><p>The addresses of this node</p>
+</div><h4 id='method.receive' class='method'><code>fn <a href='#method.receive' class='fnname'>receive</a>(&amp;self) -&gt; <a class='enum' href='../msgpacknet/enum.Event.html' title='msgpacknet::Event'>Event</a>&lt;M, N, I&gt;</code></h4>
+<div class='docblock'><p>Receive an event</p>
+
+<p>This method returns the next event received. If events are queued, the oldest queued event
+will be returned. Otherwise, the call will block until an event is received.</p>
+
+<p>If the node has been closed, <code>Event::Closed</code> will be returned immediately.</p>
+</div><h4 id='method.node_id' class='method'><code>fn <a href='#method.node_id' class='fnname'>node_id</a>(&amp;self) -&gt; N</code></h4>
+<div class='docblock'><p>The id of this node</p>
+</div><h4 id='method.is_connected' class='method'><code>fn <a href='#method.is_connected' class='fnname'>is_connected</a>(&amp;self, id: &amp;N) -&gt; <a href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<div class='docblock'><p>Whether this node is connected to the given node</p>
+</div><h4 id='method.connection_count' class='method'><code>fn <a href='#method.connection_count' class='fnname'>connection_count</a>(&amp;self) -&gt; <a href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a></code></h4>
+<div class='docblock'><p>The number of fully established connections</p>
+</div><h4 id='method.stats' class='method'><code>fn <a href='#method.stats' class='fnname'>stats</a>(&amp;self) -&gt; <a class='struct' href='../msgpacknet/struct.NodeStats.html' title='msgpacknet::NodeStats'>NodeStats</a>&lt;N&gt;</code></h4>
+<div class='docblock'><p>The statistics of this node</p>
+</div><h4 id='method.send' class='method'><code>fn <a href='#method.send' class='fnname'>send</a>(&amp;self, dst: &amp;N, msg: &amp;M) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a class='enum' href='../msgpacknet/enum.Error.html' title='msgpacknet::Error'>Error</a>&lt;N&gt;&gt;</code></h4>
+<div class='docblock'><p>Send a message</p>
+
+<p>This method sends a message to the given destination. The message must be encodable using
+<code>serde</code> and the node must be connected to the destination.
+It is possible to send messages to the node itself by using its address.
+If no connection to the destination exists, an error is returned.</p>
+</div><h4 id='method.connect_request' class='method'><code>fn <a href='#method.connect_request' class='fnname'>connect_request</a>&lt;A: <a class='trait' href='https://doc.rust-lang.org/nightly/std/net/addr/trait.ToSocketAddrs.html' title='std::net::addr::ToSocketAddrs'>ToSocketAddrs</a>&gt;(&amp;self, addr: A) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='../msgpacknet/struct.ConnectionRequest.html' title='msgpacknet::ConnectionRequest'>ConnectionRequest</a>&lt;M, N, I&gt;, <a class='enum' href='../msgpacknet/enum.Error.html' title='msgpacknet::Error'>Error</a>&lt;N&gt;&gt;</code></h4>
+<div class='docblock'><p>Open a connection and return the request</p>
+
+<p>This method opens a connection, exchanges initialization messages with the peer and returns
+a connection request. This request object can then be used to inspect the node id and the
+initialization message and then decide whether to <code>accept()</code> or <code>reject()</code> the connection.
+This method blocks until the underlying connection has been established and the
+initialization messages have been exchanged.</p>
+
+<p>For more details see <a href="#method.connect"><code>connect(...)</code></a>.</p>
+</div><h4 id='method.connect' class='method'><code>fn <a href='#method.connect' class='fnname'>connect</a>&lt;A: <a class='trait' href='https://doc.rust-lang.org/nightly/std/net/addr/trait.ToSocketAddrs.html' title='std::net::addr::ToSocketAddrs'>ToSocketAddrs</a>&gt;(&amp;self, addr: A) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;N, <a class='enum' href='../msgpacknet/enum.Error.html' title='msgpacknet::Error'>Error</a>&lt;N&gt;&gt;</code></h4>
+<div class='docblock'><p>Open a connection and accept it automatically</p>
+
+<p>This method opens a connection, exchanges initialization messages with the peer,
+automatically accepts the peer and returns its node_id.
+This method blocks until the underlying connection has been established and the
+initialization messages have been exchanged.</p>
+
+<p>Note: This connection will automatically be closed when it becomes idle for longer than the
+      <a href="#method.set_connection_timeout">specified timeout</a>.</p>
+
+<p>Note 2: It is possible to connect the node to itself. However, messages will just be
+        short-circuited and the connection will not be used and closed after the timeout.</p>
+</div><h4 id='method.lookup_connection' class='method'><code>fn <a href='#method.lookup_connection' class='fnname'>lookup_connection</a>&lt;A: <a class='trait' href='https://doc.rust-lang.org/nightly/std/net/addr/trait.ToSocketAddrs.html' title='std::net::addr::ToSocketAddrs'>ToSocketAddrs</a>&gt;(&amp;self, addr: A) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;N&gt;</code></h4>
+<div class='docblock'><p>Returns the node id for an address if connected</p>
+
+<p>This method retrns the node id for an address if a connection to this address exists.</p>
+</div><h4 id='method.close' class='method'><code>fn <a href='#method.close' class='fnname'>close</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a class='enum' href='../msgpacknet/enum.Error.html' title='msgpacknet::Error'>Error</a>&lt;N&gt;&gt;</code></h4>
+</div><h3 class='impl'><code>impl&lt;M: <a class='trait' href='../msgpacknet/trait.Message.html' title='msgpacknet::Message'>Message</a>, N: <a class='trait' href='../msgpacknet/trait.NodeId.html' title='msgpacknet::NodeId'>NodeId</a>, I: <a class='trait' href='../msgpacknet/trait.InitMessage.html' title='msgpacknet::InitMessage'>InitMessage</a>&gt; <a class='struct' href='../msgpacknet/struct.Node.html' title='msgpacknet::Node'>Node</a>&lt;M, N, I&gt; <span class='where'>where N: <a class='trait' href='../rand/trait.Rand.html' title='rand::Rand'>Rand</a></span></code></h3><div class='impl-items'><h4 id='method.with_random_id' class='method'><code>fn <a href='#method.with_random_id' class='fnname'>with_random_id</a>(init: I) -&gt; <a class='struct' href='../msgpacknet/struct.CloseGuard.html' title='msgpacknet::CloseGuard'>CloseGuard</a>&lt;M, N, I&gt;</code></h4>
+<div class='docblock'><p>Create a new node with a random id</p>
+</div></div><h3 class='impl'><code>impl&lt;M: <a class='trait' href='../msgpacknet/trait.Message.html' title='msgpacknet::Message'>Message</a>, N: <a class='trait' href='../msgpacknet/trait.NodeId.html' title='msgpacknet::NodeId'>NodeId</a>&gt; <a class='struct' href='../msgpacknet/struct.Node.html' title='msgpacknet::Node'>Node</a>&lt;M, N, <a href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h3><div class='impl-items'><h4 id='method.without_init' class='method'><code>fn <a href='#method.without_init' class='fnname'>without_init</a>(node_id: N) -&gt; <a class='struct' href='../msgpacknet/struct.CloseGuard.html' title='msgpacknet::CloseGuard'>CloseGuard</a>&lt;M, N, <a href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Create a new node with a random id</p>
+</div></div><h3 class='impl'><code>impl&lt;M: <a class='trait' href='../msgpacknet/trait.Message.html' title='msgpacknet::Message'>Message</a>, N: <a class='trait' href='../msgpacknet/trait.NodeId.html' title='msgpacknet::NodeId'>NodeId</a>&gt; <a class='struct' href='../msgpacknet/struct.Node.html' title='msgpacknet::Node'>Node</a>&lt;M, N, <a href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt; <span class='where'>where N: <a class='trait' href='../rand/trait.Rand.html' title='rand::Rand'>Rand</a></span></code></h3><div class='impl-items'><h4 id='method.create_default' class='method'><code>fn <a href='#method.create_default' class='fnname'>create_default</a>() -&gt; <a class='struct' href='../msgpacknet/struct.CloseGuard.html' title='msgpacknet::CloseGuard'>CloseGuard</a>&lt;M, N, <a href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Create a new node with a random id and without init message</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl&lt;M: <a class='trait' href='../msgpacknet/trait.Message.html' title='msgpacknet::Message'>Message</a>, N: <a class='trait' href='../msgpacknet/trait.NodeId.html' title='msgpacknet::NodeId'>NodeId</a>, I: <a class='trait' href='../msgpacknet/trait.InitMessage.html' title='msgpacknet::InitMessage'>InitMessage</a>&gt; <a class='trait' href='https://doc.rust-lang.org/nightly/core/ops/trait.Deref.html' title='core::ops::Deref'>Deref</a> for <a class='struct' href='../msgpacknet/struct.Node.html' title='msgpacknet::Node'>Node</a>&lt;M, N, I&gt;</code></h3><div class='impl-items'><h4 id='assoc_type.Target' class='type'><code>type Target = NodeInner&lt;M, N, I&gt;</code></h4>
+<h4 id='method.deref' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/ops/trait.Deref.html#method.deref' class='fnname'>deref</a>(&amp;self) -&gt; &amp;Self::Target</code></h4>
+</div><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl&lt;M: <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> + <a class='trait' href='../msgpacknet/trait.Message.html' title='msgpacknet::Message'>Message</a>, N: <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> + <a class='trait' href='../msgpacknet/trait.NodeId.html' title='msgpacknet::NodeId'>NodeId</a>, I: <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> + <a class='trait' href='../msgpacknet/trait.InitMessage.html' title='msgpacknet::InitMessage'>InitMessage</a>&gt; <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../msgpacknet/struct.Node.html' title='msgpacknet::Node'>Node</a>&lt;M, N, I&gt;</code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../msgpacknet/struct.Node.html' title='msgpacknet::Node'>Node</a>&lt;M, N, I&gt;</code></h4>
+<h4 id='method.clone_from' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "msgpacknet";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script async src="../search-index.js"></script>
+</body>
+</html>

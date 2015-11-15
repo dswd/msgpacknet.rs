@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error",""]],"struct":[["Serializer","Represents MessagePack serialization implementation."],["StructArrayWriter","Writes struct as MessagePack array with no field names"]],"trait":[["VariantWriter",""]]});

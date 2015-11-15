@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error","Unstable: docs; incomplete"]],"struct":[["Deserializer","Note"],["VariantVisitor","Default variant visitor."]],"type":[["Result",""]]});
